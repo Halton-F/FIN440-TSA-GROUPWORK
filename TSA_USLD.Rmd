@@ -7,7 +7,6 @@ resource_files:
 - TSA_template.Rmd
 - TSA_template.Rmd
 ---
-lkasdknsadnksadjkndasjkn
 
 <style type="text/css"> body, td {font-size: 12px;} code.r{font-size: 10px;} pre {font-size: 10px} </style>
 
