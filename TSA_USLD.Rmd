@@ -21,7 +21,7 @@ library(tidyr)
 iuser = "morningstar.ctrd@ualberta.ca"
 ipassword = "oRakvwtPVg"
 ```
-
+x
 **this template is a guide to organize your project in a clear manner**
 
 **quality of presentation refers amongst others to showing code, tables and charts in a manner that flows with your story. Details and computations shall remain in the code chunks without being rendered into the html output.**
