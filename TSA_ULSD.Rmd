@@ -254,7 +254,7 @@ p %>% plotly::ggplotly()
 ```
 
 
-```{r, eval=FALSE}
+```{r}
 #Transport Services Index
 #TSI is indexed at 100 which was the average of the index for January 2000.
 #Truck Tonnage Index is an indicator of shipping activity and consumption of goods. Gross tonnage of freight transport each month
@@ -262,25 +262,21 @@ p %>% plotly::ggplotly()
 #Passenger TSI measures changes in passenger travel 
 #https://data.bts.gov/stories/s/9czv-tjte#demand-for-for-hire-transportation-services
 library(RSocrata)
+fig.title = "US Transport Indicies"
 RSocrata_Key <- "34EB8ySLaX2e5P78xYb5TnmtP"
 US_Transport_df <- read.socrata("https://data.bts.gov/resource/bw6n-ddqk.json", app_token = RSocrata_Key)
-US_Transport_df %>% dplyr::select(obs_date, truck_d11, vmt_d11, tsi_freight, tsi_passenger) %>% 
-  dplyr::rename(Date = obs_date, Truck_Tonnage_Index = truck_d11, Vehicle_Miles_Traveled = vmt_d11, Freight_TSI = tsi_freight, Passenger_TSI = tsi_passenger) %>% 
+US_Transport_df <- US_Transport_df %>% dplyr::select(obs_date, truck_d11, tsi_freight, tsi_passenger) %>% 
+  dplyr::rename(Date = obs_date, Truck_Tonnage_Index = truck_d11, Freight_TSI = tsi_freight, Passenger_TSI = tsi_passenger) %>% 
   tidyr::pivot_longer(-Date, names_to = "series", values_to = "values") %>% 
   dplyr::mutate(Date = as.Date(Date)) %>% 
   stats::na.omit()
-
-%>% 
-  
-  
-
+US_Transport_df[ ,3] <- sapply(US_Transport_df[ , 3], as.numeric)
+Transport_Indicies <- US_Transport_df %>% 
   ggplot(aes(x = Date, y = values, color = series)) + 
   geom_line() +
-  scale_y_continuous(labels = scales::comma)
-
-
-
-
+  scale_y_continuous(labels = scales::comma)+
+  labs(title = fig.title, y = "Index Value", x = "Date")
+Transport_Indicies %>% plotly::ggplotly()
 ```
 + Clearly laid out components of SD balances.
 + State why they matter.
