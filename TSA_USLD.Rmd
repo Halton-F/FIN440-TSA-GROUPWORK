@@ -17,9 +17,12 @@ library(plotly)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(purrr)
+library(scales)
 #Morningstar API Login
 iuser = "morningstar.ctrd@ualberta.ca"
 ipassword = "oRakvwtPVg"
+EIAkey = "7658ca55759776ff3116f4e3e927948e"
 ```
 
 **this template is a guide to organize your project in a clear manner**
@@ -31,6 +34,8 @@ ipassword = "oRakvwtPVg"
 The main futures contracts used to trade ULSD will be the NY Harbor ULSD Futures. These contracts are standardized to 42,000 gallons (1,000 barrels). The ULSD delivery location is New York Harbor with options for delivery into the buyer's barge, tanker, or pipeline if they are able. The product must meet the specification of the Colonial Pipeline's Fungible Grade 62 for Ultra Low Sulfur Diesel and must be designated for sale in accordance with U.S. Environmental Protection Agency regulations.  
 
 NY Harbor ULSD Futures Handbook: https://www.cmegroup.com/content/dam/cmegroup/rulebook/NYMEX/1a/150.pdf  
+
+ULSD is also referred to as distillate and is the second-most consumed petroleum product in the United States. In addition to its use as a transportation fuel, distillate is also consumed for heating and power generation purposes. Distillate's use as a heating fuel drives the seasonal pattern of higher consumption during the winter months. Distillate consumption is affected by economic growth and weather conditions as well as vehicle efficiency and miles traveled of heavy-duty vehicles.
 
 ```{r}
 #Extracting the March and April Contracts
@@ -158,12 +163,39 @@ HOdf %>%
   yaxis = list(
     title = "$ per Barrel")
   )
-
+```
+```{r}
+#ULSD is also used for heating oil in some homes in the US and Canada so we would expect to see some seasonality in demand and pricing. US residential use is most common in the northeastern states of New York and Pennsylvania and into New England. These locations account for 86% of total US residential heating oil use. To attempt to visualize any relationship between USLD prices and the temperatures of colder winter months we decided to pull temperature data for New York. 
+#Still work in progress
 ```
 
+```{r, eval=FALSE}
+#Weather Data - Relevant to ULSD
+#riem is the data package for weather data services
+#Still work in progress
+library(riem)
 
-**Disregard the sections below for the time being**
-
+nyc_weather <- riem::riem_measures(station = "NYC",
+                    date_start = "2010-01-01",
+                    date_end = Sys.Date()) %>% 
+  tidyr::separate(valid, c("date", "time"), sep = " ") %>% 
+  base::subset(select = c(date,tmpf)) %>% 
+  dplyr::group_by(date) %>% 
+  dplyr::mutate(temp = mean(tmpf)) %>% 
+  ungroup(date) %>% dplyr::select(-tmpf) %>% distinct() %>% 
+  stats::na.omit() %>% dplyr::mutate(date = as.Date(date))
+#Graphical Depication
+p <- nyc_weather %>% 
+  ggplot(aes(y = temp, x = date, col = temp, alpha = 1, show.legend = FALSE)) +
+  geom_point() + 
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  labs(
+    title = "NYC Temperature",
+    caption = "Source: IEM",
+    y = "Temperature (F)",
+    x = "")
+ggplotly(p)
+```
 ## Summary
 
 ### What's changed
@@ -176,17 +208,80 @@ HOdf %>%
 
 ### Supply Demand Indicators
 
-Build a SD balance dashboard to support forming and explaining a market view below.
-
 ```{r}
 # You are expected to build your own SD balance from the EIA and other website APIs
-# The following is an example of series names for Crude SD components to get you going.
 # It is by no means a substitute for doing your own research
 library(RTL)
 data("tickers_eia")
-tickers_eia %>% dplyr::filter(product == "crude")
+sd <- tickers_eia %>% dplyr::filter(sd_category == "dist", category != "stocks") %>% 
+dplyr::as_tibble()
+
+eia_df <- tibble::tribble(~ticker, ~name) %>% 
+  add_row(ticker = sd$tick.eia[1:nrow(sd)], name = sd$tick.r[1:nrow(sd)]) %>% 
+  dplyr::mutate(key = EIAkey) %>% 
+  dplyr::mutate(df = purrr::pmap(list(ticker, key, name), .f = RTL::eia2tidy)) %>% 
+  dplyr::select(df) %>% tidyr::unnest(df)
+  
+fig.title = "ULSD US SD Balance Components (kbd)"
+
+p1 <- eia_df %>% 
+  dplyr::filter(date >= "2000-01-01") %>% 
+  ggplot(aes(x = date, y = value, color = series)) +
+  geom_line() + 
+  scale_y_continuous(labels = comma) +
+  labs(title = fig.title, y = "kbd", x = "")
+p1 %>% ggplotly()
 ```
 
+```{r}
+#Implied storage builds and draws
+data2 <- eia_df %>% 
+  tidyr::pivot_wider(date, names_from = series, values_from = value) %>% 
+  dplyr::rename(Demand = eia.mdist.demand, Imports = eia.mdist.imports, Supply = eia.mdist.supply, Exports = eia.mdist.exports) %>%   dplyr::arrange(date) %>% 
+  dplyr::filter(date >= "2010-01-01") %>% 
+  tidyr::drop_na() %>% 
+  dplyr::mutate(Storage = Supply + Imports - Demand - Exports)
+
+#Graphical Transformation
+fig.title = "Implied Storage Builds/Draws for ULSD"
+p <- data2 %>% 
+  tidyr::pivot_longer(-date, names_to = "series", values_to = "value") %>% 
+  ggplot(aes(x = date, y = value, color = series)) + 
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = fig.title, y = "kbd", x = "")
+p %>% plotly::ggplotly()
+```
+
+
+```{r}
+#Transport Services Index
+#TSI is indexed at 100 which was the average of the index for January 2000.
+#Truck Tonnage Index is an indicator of shipping activity and consumption of goods. Gross tonnage of freight transport each month
+#Freight TSI measures the volume of freight moved monthly in the US
+#Passenger TSI measures changes in passenger travel 
+#https://data.bts.gov/stories/s/9czv-tjte#demand-for-for-hire-transportation-services
+library(RSocrata)
+RSocrata_Key <- "34EB8ySLaX2e5P78xYb5TnmtP"
+US_Transport_df <- read.socrata("https://data.bts.gov/resource/bw6n-ddqk.json", app_token = RSocrata_Key)
+US_Transport_df %>% dplyr::select(obs_date, truck_d11, vmt_d11, tsi_freight, tsi_passenger) %>% 
+  dplyr::rename(Date = obs_date, Truck_Tonnage_Index = truck_d11, Vehicle_Miles_Traveled = vmt_d11, Freight_TSI = tsi_freight, Passenger_TSI = tsi_passenger) %>% 
+  tidyr::pivot_longer(-Date, names_to = "series", values_to = "values") %>% 
+  dplyr::mutate(Date = as.Date(Date)) %>% 
+  stats::na.omit()
+
+%>% 
+  
+  
+
+  ggplot(aes(x = Date, y = values, color = series)) + 
+  geom_line() +
+  scale_y_continuous(labels = scales::comma)
+
+
+
+
+```
 + Clearly laid out components of SD balances.
 + State why they matter.
 + Provide both long term and short term views. Your trade horizon is weekly - can you identify clearly from the chart when a change occurs?
