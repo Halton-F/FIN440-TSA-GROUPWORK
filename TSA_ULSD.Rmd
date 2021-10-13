@@ -31,12 +31,6 @@ EIAkey = "7658ca55759776ff3116f4e3e927948e"
 
 ## Experimentation Part
 
-The main futures contracts used to trade ULSD will be the NY Harbor ULSD Futures. These contracts are standardized to 42,000 gallons (1,000 barrels). The ULSD delivery location is New York Harbor with options for delivery into the buyer's barge, tanker, or pipeline if they are able. The product must meet the specification of the Colonial Pipeline's Fungible Grade 62 for Ultra Low Sulfur Diesel and must be designated for sale in accordance with U.S. Environmental Protection Agency regulations.  
-
-NY Harbor ULSD Futures Handbook: https://www.cmegroup.com/content/dam/cmegroup/rulebook/NYMEX/1a/150.pdf  
-
-ULSD is also referred to as distillate and is the second-most consumed petroleum product in the United States. In addition to its use as a transportation fuel, distillate is also consumed for heating and power generation purposes. Distillate's use as a heating fuel drives the seasonal pattern of higher consumption during the winter months. Distillate consumption is affected by economic growth and weather conditions as well as vehicle efficiency and miles traveled of heavy-duty vehicles.
-
 ```{r}
 #Extracting the March and April Contracts
 df <- RTL::getPrices(
@@ -197,6 +191,11 @@ p <- nyc_weather %>%
 ggplotly(p)
 ```
 ## Summary
+The main futures contracts used to trade ULSD will be the NY Harbor ULSD Futures (ticker HO). These contracts are standardized to 42,000 gallons (1,000 barrels). The ULSD delivery location is New York Harbor with options for delivery into the buyer's barge, tanker, or pipeline if they are able. The product must meet the specification of the Colonial Pipeline's Fungible Grade 62 for Ultra Low Sulfur Diesel and must be designated for sale in accordance with U.S. Environmental Protection Agency regulations. As of 2016, almost all petroleum-based diesel fuel available in the UK, mainland Europe, and North America is ultra low sulphur. 
+
+NY Harbor ULSD Futures Handbook: https://www.cmegroup.com/content/dam/cmegroup/rulebook/NYMEX/1a/150.pdf  
+
+ULSD is also commonly referred to as distillate and is the second-most consumed petroleum product in the United States. In addition to its use as a transportation fuel, distillate is also consumed for heating and power generation purposes. Distillate's use as a heating fuel drives the seasonal pattern of higher consumption during the winter months. Distillate consumption is affected by economic growth and weather conditions as well as vehicle efficiency and miles traveled of heavy-duty vehicles.
 
 ### What's changed
 
@@ -208,6 +207,15 @@ ggplotly(p)
 
 ### Supply Demand Indicators
 
+Production: Most of the diesel fuel produced and consumed in the US is refined from crude oil at petroleum refineries within the US. These refineries produce an average of 11 to 12 gallons of diesel fuel for every 42 gallon barrel of crude. Production decisions by refineries are also effected by the sprad between diesel and gasoline prices as when the spread widens refineries increase the amount of diesel that they produce relative to gasoline. The standard crack-spread at refineries is generally 3-2-1, meaning that for 3 barrels of crude that 2 will be refined into gasoline and 1 will be refined into ULSD.
+
+Consumption: More than 8 million mones in New Englad and the Central Atlantic Region of the US lack access to natural gas so they use Heating Oil (ULSD). This makes one of ULSD’s end markets consumers those who require ULSD for their home heating needs. Due to this there is some seasonality in pricing during the cold winter months. Residential heating oil consumption peaked in the 1970's and declined nearly every year since. 81%  of residential heating use is concentrated in the US Northeast including New York, Pennsylvania, and New England. Diesel is mainly used as a transport fuel and consumption is impacted by the underlying economic conditions, fuel efficiency, and miles traveled by heavy duty vehicles. In 2020, diesel fuel consumption was about 44.61 billion gallons which averages to about 122 million gallons per day. PADD 3 has been a net exported of diesel since 2001 which is logical given the number of refineries located in the US Gulf Coast and the fuel needs across the US. 
+
+Components of the price you see at the pumps: The cost of crude oil purchased by refineries, refining costs, distribution and marketing costs, and state taxes all influence the price you see at the pumps.
+
+Location Prices for Diesel: There are a few different geographic markets for diesel including Chicago ULSD, NYH ULSD, Gulf Coast ULSD, Los Angeles ULSD, Northwest Europe ULSD, and Singapore gasoil 500PPM.
+
+Transportation: Most diesel fuel moves by pipeline from refineries and ports to terminals near major consuming areas. Barges and trains also move diesel to terminals. Trucks transport the diesel fuel from the terminals to retail service stations and to large volume consumers such as fleet operators. 
 ```{r}
 # You are expected to build your own SD balance from the EIA and other website APIs
 # It is by no means a substitute for doing your own research
