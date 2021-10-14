@@ -71,6 +71,7 @@ HOdf <- dplyr::inner_join(df,df2) %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts, "_0")) %>% 
   plotly::plot_ly(
+    width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~ Contracts,
@@ -90,6 +91,7 @@ HOdf %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts,c("CL22H", "CL22J", "HO22H", "HO22J")))%>% 
   plotly::plot_ly(
+    width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~ Contracts,
@@ -110,6 +112,7 @@ HOdf %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts, "c1c2")) %>% 
   plotly::plot_ly(
+    width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~Contracts
@@ -128,6 +131,7 @@ HOdf %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts, "Apr")) %>% 
   plotly::plot_ly(
+    width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~Contracts
@@ -146,6 +150,7 @@ HOdf %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts, "Crack")) %>% 
   plotly::plot_ly(
+    width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~Contracts
@@ -188,7 +193,7 @@ p <- nyc_weather %>%
     caption = "Source: IEM",
     y = "Temperature (F)",
     x = "")
-ggplotly(p)
+ggplotly(p,width = 700, height = 400,)
 ```
 ## Summary
 The main futures contracts used to trade ULSD will be the NY Harbor ULSD Futures (ticker HO). These contracts are standardized to 42,000 gallons (1,000 barrels). The ULSD delivery location is New York Harbor with options for delivery into the buyer's barge, tanker, or pipeline if they are able. The product must meet the specification of the Colonial Pipeline's Fungible Grade 62 for Ultra Low Sulfur Diesel and must be designated for sale in accordance with U.S. Environmental Protection Agency regulations. As of 2016, almost all petroleum-based diesel fuel available in the UK, mainland Europe, and North America is ultra low sulphur. 
@@ -238,7 +243,7 @@ p1 <- eia_df %>%
   geom_line() + 
   scale_y_continuous(labels = comma) +
   labs(title = fig.title, y = "kbd", x = "")
-p1 %>% ggplotly()
+p1 %>% ggplotly(width = 700, height = 400,)
 ```
 
 ```{r}
@@ -258,7 +263,7 @@ p <- data2 %>%
   geom_line() +
   scale_y_continuous(labels = scales::comma) +
   labs(title = fig.title, y = "kbd", x = "")
-p %>% plotly::ggplotly()
+p %>% plotly::ggplotly(width = 700, height = 400,)
 ```
 
 
@@ -284,7 +289,7 @@ Transport_Indicies <- US_Transport_df %>%
   geom_line() +
   scale_y_continuous(labels = scales::comma)+
   labs(title = fig.title, y = "Index Value", x = "Date")
-Transport_Indicies %>% plotly::ggplotly()
+Transport_Indicies %>% plotly::ggplotly(width = 700, height = 400,)
 ```
 + Clearly laid out components of SD balances.
 + State why they matter.
