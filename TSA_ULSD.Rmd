@@ -103,7 +103,6 @@ HOdf %>%
   xaxis = list(title = "Date"),
   yaxis = list(
     title = "$ per Barrel")
-  
   )
 ```
 
