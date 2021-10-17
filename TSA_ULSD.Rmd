@@ -558,7 +558,35 @@ plot(ENG_Solar_trend)
 ```
 
 ### Market View
-
+```{r}
+#Pulling the Forward Curve for HO
+fig.title = "Heating Oil Futures Forward Curve"
+HO_Curve <- RTL::getCurve(
+  feed = "Crb_Futures_Price_Volume_And_Open_Interest",
+  contract = "HO",
+  date = "2021-10-14",
+  iuser = iuser,
+  ipassword = ipassword
+) %>% 
+  dplyr::select(c("contract", "Close")) %>% 
+  dplyr::mutate(Close = Close * 42)
+HO_Curve %>% 
+  plot_ly(
+    x = ~contract,
+    y = ~Close,
+    type = "scatter",
+    mode = "markers",
+    name = "Forward Curve") %>% 
+  plotly::layout(
+    title = list(text = fig.title, x = 0),
+    xaxis = list(
+      title = "Contract",
+      categoryorder = "array",
+      categoryarray = ~ contract
+    ),
+    yaxis = list(title = "$ per bbl")
+  )
+```
 + View based on SD indicators ensuring that your conclusions are clearly readable from your charts.
 + Build analytics that is relevant to your current view.
 + If you have explored more, put them in an appendix. 
