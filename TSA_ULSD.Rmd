@@ -291,9 +291,271 @@ Transport_Indicies <- US_Transport_df %>%
   labs(title = fig.title, y = "Index Value", x = "Date")
 Transport_Indicies %>% plotly::ggplotly(width = 700, height = 400,)
 ```
+
+
+```{r}
+#download and save weather data into local:
+
+# library(riem)
+# station_id_vec = c("NYC","PHL","BOS","BDR","PWM")
+# 
+# 
+# weather <-
+#   riem::riem_measures(station = station_id_list[[2]],
+#                       date_start = "2010-01-01",
+#                       date_end = Sys.Date()) %>%
+#   tidyr::separate(valid, c("date", "time"), sep = " ") %>%
+#   base::subset(select = c(date, tmpf)) %>%
+#   dplyr::group_by(date) %>%
+#   dplyr::mutate(temp = mean(tmpf)) %>%
+#   ungroup(date) %>% dplyr::select(-tmpf) %>% distinct() %>%
+#   stats::na.omit() %>% dplyr::mutate(date = as.Date(date))
+# 
+# 
+# weather  
+# write.table(weather,"PWM.csv",sep = ",")
+
+
+```
+```{r }
+#load data from csv files
+
+library(dplyr)
+df_NYC = read.csv("NYC.csv",sep = ",")
+df_PHL = read.csv("PHL.csv",sep = ",")
+df_BOS = read.csv("BOS.csv",sep = ",")
+df_BDR = read.csv("BDR.csv",sep = ",")
+df_PWM = read.csv("PWM.csv",sep = ",")
+
+
+list_wea <- list(df_NYC,df_PHL,df_BOS,df_BDR,df_PWM)
+list_reg <- list("NYC","PHL","BOS","BDR","PWM")
+list_range <- c(1,2,3,4,5)
+
+for (i in list_range) {
+  list_wea[[i]] <- list_wea[[i]] %>% 
+  dplyr::mutate(
+    region = list_reg[[i]]
+  )
+}
+
+  
+#transfer date into date type  
+df_weather <-list_wea %>% 
+  dplyr::bind_rows(list_wea,id=NULL) %>% 
+  dplyr::group_by(region)
+
+df_weather$date = as.Date(df_weather$date)
+df_weather
+
+```
+
+
+```{r weather}
+#we need to analyze the temperature data for these 5 regions(New York,Pennsylvania,Massachusetts,Connecticut,Maine)
+
+fig.title = "Northeast Temperature"
+
+p <- df_weather %>%
+  ggplot(aes(
+    y = temp,
+    x = date,
+    col = region,
+    alpha = 0.1,
+    show.legend = FALSE
+  )) +
+  geom_point() +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  labs(
+    title = "Northeast Region Temperature",
+    caption = "Source: IEM",
+    y = "Temperature (F)",
+    x = ""
+  )
+ggplotly(p)
+```
+
+From the chart above, we found that these 5 regions have almost same temperature curve. However,except region New York City (NYC), much data between the range of (2016-2021) is missing. For convenience, New York City (NYC) data would be used to stand for the whole Northeast Region.
+```{r}
+#get continious future price for HO and CL
+#we would like to trade for crack-spread
+
+fig.title = "Correlations - GGally"
+library(GGally)
+
+
+HOdf %>%filter(Contracts== c('HO_01','HO_02','CL_01','CL_02')) %>% 
+  tidyr::pivot_wider(names_from = Contracts, values_from = Price) %>%
+  dplyr::select(-date) %>%
+  na.omit() %>%
+  GGally::ggpairs()
+```
+
+```{r}
+
+HOdf %>% 
+  dplyr::filter(Contracts == "HO_Crack_Spd")%>% 
+  plotly::plot_ly(
+    width = 700, height = 400,
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "Crack Spread(HO22H - CL22H)", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+```{r}
+library(stats)
+df_weather <- df_weather %>% filter(region == "NYC") %>% ungroup()
+
+
+
+df_weather_ts <- dplyr::arrange(df_weather,date) %>% 
+  dplyr::select(temp) %>% 
+  stats::ts(start=c(2010,1),end = c(2021,1),frequency=12) #based on month 
+df_weather_ts
+
+df_weather_decomp <- df_weather_ts%>% 
+  stats::decompose()
+
+plot(df_weather_decomp)
+
+
+weather_seasonal_adjusted <- df_weather_ts-df_weather_decomp$seasonal
+plot(weather_seasonal_adjusted)
+
+library(zoo)
+
+#transfer the time series into df
+df <- data.frame(date = yearmon(index(weather_seasonal_adjusted)), val = weather_seasonal_adjusted) 
+df$date<- as.Date(df$date)
+
+# df <- df %>% 
+#   dplyr::mutate(
+#     Electricity_Net_Generation = "ENG_Total"
+#   )
+colnames(df)[2] <- "temp"
+
+
+df_weather_seasonal_adjusted <- df %>% 
+  na.omit()
+
+df_weather_seasonal_adjusted
+```
+```{r}
+df_crack_spread <- filter(HOdf,Contracts == "HO_Crack_Spd")
+df_crack_spread
+
+
+
+df_crack_spread_ts <- dplyr::arrange(df_crack_spread,date) %>% 
+  dplyr::select(Price) %>% 
+  stats::ts(start=c(2010,1),end = c(2021,1),frequency=12) #based on month 
+df_crack_spread_ts
+
+df_crack_spread_decomp <- df_crack_spread_ts%>% 
+  stats::decompose()
+
+plot(df_crack_spread_decomp)
+
+crack_spread_adjusted <- df_crack_spread_ts-df_crack_spread_decomp$seasonal
+plot(crack_spread_adjusted)
+
+library(zoo)
+
+#transfer the time series into df
+df <- data.frame(date = yearmon(index(crack_spread_adjusted)), val = crack_spread_adjusted) 
+df$date<- as.Date(df$date)
+
+# df <- df %>% 
+#   dplyr::mutate(
+#     Electricity_Net_Generation = "ENG_Total"
+#   )
+colnames(df)[2] <- "Price"
+
+
+df_crack_spread_adjusted <- df %>% 
+  na.omit()
+
+df_crack_spread_adjusted
+```
+
+```{r}
+#corr b/w crack_spread and temp
+df_weather_seasonal_adjusted
+df_crack_spread_adjusted
+
+#merge the df
+
+df_merge <- inner_join(df_crack_spread_adjusted,df_weather_seasonal_adjusted,copy = False)
+df_merge
+library(GGally)
+
+
+df_merge %>%
+  # filter (months.Date(date) == c("01"))%>% 
+  dplyr::select(-date) %>%
+  na.omit() %>%
+  GGally::ggpairs()
+```
+
+# Result:
+The result above indicate that the CORR is -0.244, negative correlative. The significance is 2 stars.
+In other words, if the temperature goes up, the crack-spread may increase; if the the temperature goes down, the crack-spread may decrease.
+The result is reasonable, since if the temperature decrease, it looks like the demand for HO would increase, which make the price of HO increase. Assumed the CL price does not change, the crack-spread would increase.
+
+
+```{r}
+df_ENG_Solar_ts <- dplyr::arrange(df_ENG_Solar,date) %>% 
+  dplyr::select(absolute_change) %>% 
+  stats::ts(start=c(2010,1), end= c(2020,4),frequency=12) #based on month 
+# df_ENG_Solar_ts
+
+df_ENG_Solar_decomp <- df_ENG_Solar_ts%>% 
+  stats::decompose()
+
+# plot(df_ENG_Solar_decomp)
+
+
+
+ENG_Solar_seasonal <- df_ENG_Solar_decomp$seasonal
+# plot(ENG_Solar_seasonal)
+
+ENG_Solar_trend<-df_ENG_Solar_decomp$trend
+plot(ENG_Solar_trend,ylim = c(0,1000/2))
+
+
+
+df_ENG_Solar_ts <- dplyr::arrange(df_ENG_Solar,date) %>% 
+  dplyr::select(value) %>% 
+  stats::ts(start=c(2010,1), end= c(2020,4),frequency=12) #based on month 
+# df_ENG_Solar_ts
+
+df_ENG_Solar_decomp <- df_ENG_Solar_ts%>% 
+  stats::decompose()
+
+# plot(df_ENG_Solar_decomp)
+
+
+
+ENG_Solar_seasonal <- df_ENG_Solar_decomp$seasonal
+# plot(ENG_Solar_seasonal)
+
+ENG_Solar_trend<-df_ENG_Solar_decomp$trend
+plot(ENG_Solar_trend)
+```
+
 + Clearly laid out components of SD balances.
 + State why they matter.
 + Provide both long term and short term views. Your trade horizon is weekly - can you identify clearly from the chart when a change occurs?
+```{r}
+
+```
 
 ### Market View
 
