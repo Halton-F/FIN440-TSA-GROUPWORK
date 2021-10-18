@@ -1,0 +1,530 @@
+---
+title: "TSA - ULSD"
+author: "Nathaniel McNalley, Fashuai Li, Hongtian Fu, and Taylor Armbruster"
+date: "`r Sys.Date()`"
+output: html_document
+resource_files:
+- TSA_template.Rmd
+- TSA_template.Rmd
+---
+
+<style type="text/css"> body, td {font-size: 12px;} code.r{font-size: 10px;} pre {font-size: 10px} </style>
+
+```{r, echo = F, warning=FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = F,warning = F,message = F, fig.width = 4, fig.height = 3,fig.align = "center",tidy = FALSE, strip.white = TRUE)
+library(RTL)
+library(plotly)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(purrr)
+library(scales)
+#Morningstar API Login
+iuser = "morningstar.ctrd@ualberta.ca"
+ipassword = "oRakvwtPVg"
+EIAkey = "7658ca55759776ff3116f4e3e927948e"
+```
+
+**this template is a guide to organize your project in a clear manner**
+
+**quality of presentation refers amongst others to showing code, tables and charts in a manner that flows with your story. Details and computations shall remain in the code chunks without being rendered into the html output.**
+
+## Experimentation Part
+
+```{r}
+#Extracting the March and April Contracts
+df <- RTL::getPrices(
+  feed = "CME_NymexFutures_EOD",
+  contracts = c("@HO22H","@HO22J","@CL22H","@CL22J"),
+  from = "2019-08-01",
+  iuser = iuser,
+  ipassword = ipassword) 
+#Extracting the 1st and 2nd Contracts
+df2 <- RTL::getPrices(
+    feed = "CME_NymexFutures_EOD_continuous",
+    contracts = c("HO_001_Month","HO_002_Month","CL_001_Month","CL_002_Month"),
+    from = "2019-08-01",
+    iuser = iuser,
+    ipassword = ipassword)
+#Joining the Data Frames, converting to barrels, and calculating spreads
+HOdf <- dplyr::inner_join(df,df2) %>% 
+    dplyr::arrange(dplyr::desc(date)) %>% 
+  stats::na.omit()%>% 
+  dplyr::transmute(date = date,
+                   HO_01 = HO_001_Month * 42,
+                   HO_02 = HO_002_Month * 42,
+                   CL_01 = CL_001_Month,
+                   CL_02 = CL_002_Month,
+                   HO22H = HO22H * 42,
+                   HO22J = HO22J * 42,
+                   CL22H = CL22H,
+                   CL22J = CL22J,
+                   HO_c1c2_Spd = HO_01 - HO_02,
+                   HO_Apr22_Mar22_Spd = HO22H - HO22J,
+                   HO_Crack_Spd = HO22H - CL22H) %>% 
+#Converting from wide to long
+  tidyr::pivot_longer(-date, values_to = "Price", names_to = "Contracts")
+```
+
+```{r}
+#Plotting flat price for 1st and 2nd contracts
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "_0")) %>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~ Contracts,
+    type = 'scatter',
+    mode = 'lines'
+  ) %>% 
+  plotly::layout(
+    title = "Flat Price USLD vs. WTI", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+```{r}
+#Plotting flat price for March and April contracts 
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts,c("CL22H", "CL22J", "HO22H", "HO22J")))%>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~ Contracts,
+    type = 'scatter',
+    mode = 'lines'
+  ) %>% 
+  plotly::layout(
+    title = "Flat Price March & April", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+
+```{r}
+#Time spread 1st and 2nd contracts for ULSD
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "c1c2")) %>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "Time Spread: HO_01 vs HO_02", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+```{r}
+#Time spread for March and April ULSD contracts 
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "Apr")) %>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "Time Spread: March and April 2022", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+```{r}
+#Crack spread between ULSD and WTI
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "Crack")) %>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "ULSD Crack Spread: WTI March 2022", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+<<<<<<< Updated upstream
+=======
+```{r, eval=FALSE}
+#Weather Data - Relevant to ULSD
+#riem is the data package for weather data services
+#Still work in progress
+library(riem)
+
+nyc_weather <- riem::riem_measures(station = "NYC",
+                    date_start = "2010-01-01",
+                    date_end = Sys.Date()) %>% 
+  tidyr::separate(valid, c("date", "time"), sep = " ") %>% 
+  base::subset(select = c(date,tmpf)) %>% 
+  dplyr::group_by(date) %>% 
+  dplyr::mutate(temp = mean(tmpf)) %>% 
+  ungroup(date) %>% dplyr::select(-tmpf) %>% distinct() %>% 
+  stats::na.omit() %>% dplyr::mutate(date = as.Date(date))
+#Graphical Depication
+p <- nyc_weather %>% 
+  ggplot(aes(y = temp, x = date, col = temp, alpha = 1, show.legend = FALSE)) +
+  geom_point() + 
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  labs(
+    title = "NYC Temperature",
+    caption = "Source: IEM",
+    y = "Temperature (F)",
+    x = "")
+ggplotly(p)
+```
+>>>>>>> Stashed changes
+## Summary
+The main futures contracts used to trade ULSD will be the NY Harbor ULSD Futures (ticker HO). These contracts are standardized to 42,000 gallons (1,000 barrels). The ULSD delivery location is New York Harbor with options for delivery into the buyer's barge, tanker, or pipeline if they are able. The product must meet the specification of the Colonial Pipeline's Fungible Grade 62 for Ultra Low Sulfur Diesel and must be designated for sale in accordance with U.S. Environmental Protection Agency regulations. As of 2016, almost all petroleum-based diesel fuel available in the UK, mainland Europe, and North America is ultra low sulphur. 
+
+NY Harbor ULSD Futures Handbook: https://www.cmegroup.com/content/dam/cmegroup/rulebook/NYMEX/1a/150.pdf  
+
+ULSD is also commonly referred to as distillate and is the second-most consumed petroleum product in the United States. In addition to its use as a transportation fuel, distillate is also consumed for heating and power generation purposes. Distillate's use as a heating fuel drives the seasonal pattern of higher consumption during the winter months. Distillate consumption is affected by economic growth and weather conditions as well as vehicle efficiency and miles traveled of heavy-duty vehicles.
+
+### What's changed
+
+### Current Exposure
+
+### New Trades if any
+
+```{r}
+## Form a Market View
+
+T_inventory <- tibble::tribble( ~ticker, ~param, ~type,"STEO.DFPSPUS.M", "Storage", "Source") 
+data <- T_inventory %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest()
+
+
+p1 <-
+  data %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+p1 %>% plotly::ggplotly()
+```
+
+
+### Supply Demand Indicators
+
+Production: Most of the diesel fuel produced and consumed in the US is refined from crude oil at petroleum refineries within the US. These refineries produce an average of 11 to 12 gallons of diesel fuel for every 42 gallon barrel of crude. Production decisions by refineries are also effected by the sprad between diesel and gasoline prices as when the spread widens refineries increase the amount of diesel that they produce relative to gasoline. The standard crack-spread at refineries is generally 3-2-1, meaning that for 3 barrels of crude that 2 will be refined into gasoline and 1 will be refined into ULSD.
+
+Consumption: More than 8 million mones in New Englad and the Central Atlantic Region of the US lack access to natural gas so they use Heating Oil (ULSD). This makes one of ULSD’s end markets consumers those who require ULSD for their home heating needs. Due to this there is some seasonality in pricing during the cold winter months. Residential heating oil consumption peaked in the 1970's and declined nearly every year since. 81%  of residential heating use is concentrated in the US Northeast including New York, Pennsylvania, and New England. Diesel is mainly used as a transport fuel and consumption is impacted by the underlying economic conditions, fuel efficiency, and miles traveled by heavy duty vehicles. In 2020, diesel fuel consumption was about 44.61 billion gallons which averages to about 122 million gallons per day. PADD 3 has been a net exported of diesel since 2001 which is logical given the number of refineries located in the US Gulf Coast and the fuel needs across the US. 
+
+Components of the price you see at the pumps: The cost of crude oil purchased by refineries, refining costs, distribution and marketing costs, and state taxes all influence the price you see at the pumps.
+
+Location Prices for Diesel: There are a few different geographic markets for diesel including Chicago ULSD, NYH ULSD, Gulf Coast ULSD, Los Angeles ULSD, Northwest Europe ULSD, and Singapore gasoil 500PPM.
+
+Transportation: Most diesel fuel moves by pipeline from refineries and ports to terminals near major consuming areas. Barges and trains also move diesel to terminals. Trucks transport the diesel fuel from the terminals to retail service stations and to large volume consumers such as fleet operators. 
+```{r}
+# You are expected to build your own SD balance from the EIA and other website APIs
+# It is by no means a substitute for doing your own research
+library(RTL)
+data("tickers_eia")
+sd <- tickers_eia %>% dplyr::filter(sd_category == "dist", category != "stocks") %>% 
+dplyr::as_tibble()
+
+eia_df <- tibble::tribble(~ticker, ~name) %>% 
+  add_row(ticker = sd$tick.eia[1:nrow(sd)], name = sd$tick.r[1:nrow(sd)]) %>% 
+  dplyr::mutate(key = EIAkey) %>% 
+  dplyr::mutate(df = purrr::pmap(list(ticker, key, name), .f = RTL::eia2tidy)) %>% 
+  dplyr::select(df) %>% tidyr::unnest(df)
+  
+fig.title = "ULSD US SD Balance Components (kbd)"
+
+p1 <- eia_df %>% 
+  dplyr::filter(date >= "2015-01-01") %>% 
+  ggplot(aes(x = date, y = value, color = series)) +
+  geom_line() + 
+  scale_y_continuous(labels = comma) +
+  labs(title = fig.title, y = "kbd", x = "")
+p1 %>% ggplotly()
+```
+
+```{r}
+#Implied storage builds and draws
+data2 <- eia_df %>% 
+  tidyr::pivot_wider(date, names_from = series, values_from = value) %>% 
+  dplyr::rename(Demand = eia.mdist.demand, Imports = eia.mdist.imports, Supply = eia.mdist.supply, Exports = eia.mdist.exports) %>%   dplyr::arrange(date) %>% 
+  dplyr::filter(date >= "2015-01-01") %>% 
+  tidyr::drop_na() %>% 
+  dplyr::mutate(Storage = Supply + Imports - Demand - Exports)
+
+#Graphical Transformation
+fig.title = "Implied Storage Builds/Draws for ULSD"
+p <- data2 %>% 
+  tidyr::pivot_longer(-date, names_to = "series", values_to = "value") %>% 
+  ggplot(aes(x = date, y = value, color = series)) + 
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = fig.title, y = "kbd", x = "")
+p %>% plotly::ggplotly()
+```
+
+```{r}
+#Transport Services Index
+#TSI is indexed at 100 which was the average of the index for January 2000.
+#Truck Tonnage Index is an indicator of shipping activity and consumption of goods. Gross tonnage of freight transport each month
+#Freight TSI measures the volume of freight moved monthly in the US
+#https://data.bts.gov/stories/s/9czv-tjte#demand-for-for-hire-transportation-services
+library(RSocrata)
+fig.title = "US Transport Indicies"
+RSocrata_Key <- "34EB8ySLaX2e5P78xYb5TnmtP"
+US_Transport_df <- read.socrata("https://data.bts.gov/resource/bw6n-ddqk.json", app_token = RSocrata_Key)
+US_Transport_df <- US_Transport_df %>% dplyr::select(obs_date, truck_d11, tsi_freight) %>% 
+  dplyr::rename(Date = obs_date, Truck_Tonnage_Index = truck_d11, Freight_TSI = tsi_freight) %>% 
+  tidyr::pivot_longer(-Date, names_to = "series", values_to = "values") %>% 
+  dplyr::mutate(Date = as.Date(Date)) %>% 
+  stats::na.omit() %>% 
+  dplyr::filter(Date >= "2016-01-01")
+US_Transport_df[ ,3] <- sapply(US_Transport_df[ , 3], as.numeric)
+Transport_Indicies <- US_Transport_df %>% 
+  ggplot(aes(x = Date, y = values, color = series)) + 
+  geom_line() +
+  scale_y_continuous(labels = scales::comma)+
+  labs(title = fig.title, y = "Index Value", x = "Date")
+<<<<<<< Updated upstream
+Transport_Indicies %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+
+```{r}
+#download and save weather data into local:
+
+# library(riem)
+# station_id_vec = c("NYC","PHL","BOS","BDR","PWM")
+# 
+# 
+# weather <-
+#   riem::riem_measures(station = station_id_list[[2]],
+#                       date_start = "2010-01-01",
+#                       date_end = Sys.Date()) %>%
+#   tidyr::separate(valid, c("date", "time"), sep = " ") %>%
+#   base::subset(select = c(date, tmpf)) %>%
+#   dplyr::group_by(date) %>%
+#   dplyr::mutate(temp = mean(tmpf)) %>%
+#   ungroup(date) %>% dplyr::select(-tmpf) %>% distinct() %>%
+#   stats::na.omit() %>% dplyr::mutate(date = as.Date(date))
+# 
+# 
+# weather  
+# write.table(weather,"PWM.csv",sep = ",")
+```
+
+```{r}
+#load data from csv files
+
+library(dplyr)
+df_NYC = read.csv("NYC.csv",sep = ",")
+df_PHL = read.csv("PHL.csv",sep = ",")
+df_BOS = read.csv("BOS.csv",sep = ",")
+df_BDR = read.csv("BDR.csv",sep = ",")
+df_PWM = read.csv("PWM.csv",sep = ",")
+
+
+list_wea <- list(df_NYC,df_PHL,df_BOS,df_BDR,df_PWM)
+list_reg <- list("NYC","PHL","BOS","BDR","PWM")
+list_range <- c(1,2,3,4,5)
+
+for (i in list_range) {
+  list_wea[[i]] <- list_wea[[i]] %>% 
+  dplyr::mutate(
+    region = list_reg[[i]]
+  )
+}
+
+  
+#transfer date into date type  
+df_weather <-list_wea %>% 
+  dplyr::bind_rows(list_wea,id=NULL) %>% 
+  dplyr::group_by(region)
+
+df_weather$date = as.Date(df_weather$date)
+df_weather
+
+```
+
+
+```{r weather}
+#we need to analyze the temperature data for these 5 regions(New York,Pennsylvania,Massachusetts,Connecticut,Maine)
+
+fig.title = "Northeast Temperature"
+
+p <- df_weather %>%
+  ggplot(aes(
+    y = temp,
+    x = date,
+    col = region,
+    alpha = 0.1,
+    show.legend = FALSE
+  )) +
+  geom_point() +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  labs(
+    title = "Northeast Region Temperature",
+    caption = "Source: IEM",
+    y = "Temperature (F)",
+    x = ""
+  )
+ggplotly(p)
+=======
+Transport_Indicies %>% plotly::ggplotly()
+>>>>>>> Stashed changes
+```
+```{r}
+library(prophet)
+
+p10 <- data2 %>% dplyr::select(date, Supply)%>%
+  dplyr::rename(ds = date, y = Supply) %>%
+  dplyr::select(ds, y)
+m <- prophet(p10)
+future <- prophet::make_future_dataframe(m, periods = 12, freq = "month")
+tail(future)
+forecast <- predict(m, future)
+tail(forecast[c('ds', 'yhat', 'yhat_lower', 'yhat_upper')])
+p11 <- plot(m, forecast, xlabel = "", ylabel = "kbd")
+ggplotly(p11)
+```
+
+```{r}
+prophet::prophet_plot_components(m, forecast)
+```
++ Clearly laid out components of SD balances.
++ State why they matter.
++ Provide both long term and short term views. Your trade horizon is weekly - can you identify clearly from the chart when a change occurs?
+
+### Market View
+```{r}
+#Pulling the Forward Curve for HO
+fig.title = "Heating Oil Futures Forward Curve"
+HO_Curve <- RTL::getCurve(
+  feed = "Crb_Futures_Price_Volume_And_Open_Interest",
+  contract = "HO",
+  date = "2021-10-14",
+  iuser = iuser,
+  ipassword = ipassword
+) %>% 
+  dplyr::select(c("contract", "Close")) %>% 
+  dplyr::mutate(Close = Close * 42)
+HO_Curve %>% 
+  plot_ly(
+    x = ~contract,
+    y = ~Close,
+    type = "scatter",
+    mode = "markers",
+    name = "Forward Curve") %>% 
+  plotly::layout(
+    title = list(text = fig.title, x = 0),
+    xaxis = list(
+      title = "Contract",
+      categoryorder = "array",
+      categoryarray = ~ contract
+    ),
+    yaxis = list(title = "$ per bbl")
+  )
+```
+
+```{r}
+eia_df <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "STEO.DFPSPUS.M", "Inventory", "Source"
+  )
+data <- eia_df %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest()
+data
+
+p1 <-
+  data %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+p1 %>% plotly::ggplotly()
+```
++ What we see currently in the ULSD market is that refinery output for the next few quarters is constrained with any increases in domestic US supply being the result of a decrease in net exports in the short-term. In this sense domestic supply is only expected to increase by ~300 thousand barrels a day going into the winter season. 
++ With supply accounted for we need to make some assumptions about demand in the short and long term. In the short term we expect to see higher demand as a result of the cold winter months and home heating requirements, along with a continue push to solve supply chain issues across the US which would require an increase in freight transport during the holiday shopping season. Each of these factors leads us to believe that demand for ULSD in the next few quarters will be strong and outstrip US supply in the near-term.
+```{r}
+Consumption <- read.csv(file = "~/Practice/consumption_distillate_retail_2.csv")
+p20 <- Consumption %>% group_by(YEAR) %>% group_by(quarter)
+Consumption %>% plot_ly() %>% add_trace(x = p20, y = ~distillate_fuel, type = 'bar', xaxis = ~YEAR, yaxis = "y", name = 'distillate_fuel') %>% add_trace(x = p20, y = ~heating_retail, type = "scatter", mode = "lines+markers", yaxis = "y2", name = 'heating_retail') %>% layout(yaxis = list(side = "left"), yaxis2 = list(side = "right", overlaying = "y"), showlegend = TRUE)
+```
++ US distillate oil days of supply has been on a downward trend since late January 2021 with less than 36 days of supply since August. 
++Going into the winter months we would expect to see inventories increasing but with the prolonged downward trend it appears that inventory builds will solely be driven by changes in net exports as supply from refineries appears to be inelastic. If demand in the US market during the winter months increases more than the change in net exports we can expect to see increases in inventory draws and decreases in days of distillate supply. 
+
+<<<<<<< Updated upstream
+=======
+
++ View based on SD indicators ensuring that your conclusions are clearly readable from your charts.
++ Build analytics that is relevant to your current view.
++ If you have explored more, put them in an appendix. 
+>>>>>>> Stashed changes
+
+## Desired Exposure
+
+Translating your market view into strength of market call and allocate risk versus maximum limit
+
++ As we believe that demand will outstrip supply in the near term we expect to see prices rise in the next two quarters. This means that we expect to go long ULSD in the near term and if we are going to take a short position we would be taking that position outside of the nearest two quarters. We believe that the most likely timing of demand outstripping supply will occur during the winter season meaning that we will want to be long during this period. 
++ Evidence of converting market view into a strength of market call.
++ Strength of market call translates into allocating risk allocation vs your limits.
+
+## Monetization Strategies
++ Evidence of exploring what we have covered in class.
++ There are a few ways for us to profit off of our market call including making trades on flat price, time spread, and crack spread. With the historical volatility of flat price being quite high we would prefer to make trades based on other strategies. 
++ We considered a time spread that was long a contract expiring within the next two quarters and being short a contract in the second quarter of 2022. This would mean that we would profit off of any increase in price in the near-term and price decreases following the winter months, aligning with our market view.
++ We have also considered a strategy involving the crack spread where we would be long ULSD and short CL with the expectation that heightened demand in ULSD will increase the crack spread. This would also allow for possible changes in CL prices in the case that OPEC or US producers increased the supply of CL leading to decreases in the prices of both commodities. With the belief that demand and supply in the short-term for ULSD is relatively inelastic we would expect that price for ULSD to fall at a slower rate than CL in the near-term and for that difference in spread to balance out in the longer term following the holiday season. 
++ How do you take those further with exploring various combinations along the grade, delivery location and delivery timing axis.
++ Diligence in being nimble in those in light of evolving market context.
+
+## Risk Appetite
+
++ Allocate risk in the context of risk reward ensuring capital preservation.
++ Evidence of a basic framework that you utilize to make your decision. Best is if you can articulate it clearly and quantify it.
+
+## Execution
+
++ What trades are you executing? 
++ Rationale stated clearly?
++ Entry/ Exit levels stated?
++ 
+
+## Profit and Loss ("PL" Attribution
+
+For each strategy:
+
++ Provide a grid of PL attribution by risk factors (flat price, time spread, crack,) 
++ Is it in line with your market call? Learnings...
+
+## Lessons Learned
+
+What have you learned from this project?
+
+## Questions for Weekly Meeting with Prof
+
+1. a...
+2. b...
+
+
+
+
+
+
