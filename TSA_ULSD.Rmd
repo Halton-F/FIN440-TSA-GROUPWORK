@@ -464,6 +464,7 @@ p1 %>% plotly::ggplotly()
 + What we see currently in the ULSD market is that refinery output for the next few quarters is constrained with any increases in domestic US supply being the result of a decrease in net exports in the short-term. In this sense domestic supply is only expected to increase by ~300 thousand barrels a day going into the winter season. 
 + With supply accounted for we need to make some assumptions about demand in the short and long term. In the short term we expect to see higher demand as a result of the cold winter months and home heating requirements, along with a continue push to solve supply chain issues across the US which would require an increase in freight transport during the holiday shopping season. Each of these factors leads us to believe that demand for ULSD in the next few quarters will be strong and outstrip US supply in the near-term.
 ```{r}
+<<<<<<< Updated upstream
 Consumption <- read.csv(file = "~/Practice/consumption_distillate_retail_2.csv")
 p20 <- Consumption %>% group_by(YEAR) %>% group_by(quarter)
 Consumption %>% plot_ly() %>% add_trace(x = p20, y = ~distillate_fuel, type = 'bar', xaxis = ~YEAR, yaxis = "y", name = 'distillate_fuel') %>% add_trace(x = p20, y = ~heating_retail, type = "scatter", mode = "lines+markers", yaxis = "y2", name = 'heating_retail') %>% layout(yaxis = list(side = "left"), yaxis2 = list(side = "right", overlaying = "y"), showlegend = TRUE)
@@ -477,6 +478,49 @@ Consumption %>% plot_ly() %>% add_trace(x = p20, y = ~distillate_fuel, type = 'b
 + View based on SD indicators ensuring that your conclusions are clearly readable from your charts.
 + Build analytics that is relevant to your current view.
 + If you have explored more, put them in an appendix. 
+>>>>>>> Stashed changes
+=======
+eia_df <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "STEO.DFPSPUS.M", "Inventory", "Source"
+  )
+data <- eia_df %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest()
+data
+
+p1 <-
+  data %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+p1 %>% plotly::ggplotly()
+```
++ US distillate oil days of supply has been on a downward trend since late January 2021 with less than 36 days of supply since August. 
++Going into the winter months we would expect to see inventories increasing but with the prolonged downward trend it appears that inventory builds will solely be driven by changes in net exports as supply from refineries appears to be inelastic. If demand in the US market during the winter months increases more than the change in net exports we can expect to see increases in inventory draws and decreases in days of distillate supply. 
+```{r}
+eia_df <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "STEO.DFPSPUS.M", "Inventory", "Source"
+  )
+data <- eia_df %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest()
+data
+
+p1 <-
+  data %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+p1 %>% plotly::ggplotly()
+```
 >>>>>>> Stashed changes
 
 ## Desired Exposure
