@@ -507,7 +507,6 @@ df_merge %>%
 # Result:
 The result above indicate that the CORR is -0.244, negative correlative. The significance is 2 stars.
 In other words, if the temperature goes up, the crack-spread may increase; if the the temperature goes down, the crack-spread may decrease.
-The result is reasonable, since if the temperature decrease, it looks like the demand for HO would increase, which make the price of HO increase. Assumed the CL price does not change, the crack-spread would increase.
 
 
 ```{r}
