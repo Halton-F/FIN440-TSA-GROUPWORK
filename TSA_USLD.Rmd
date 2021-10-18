@@ -1,0 +1,246 @@
+---
+title: "TSA - ULSD"
+author: "Nathaniel McNalley, Fashuai Li, Hongtian Fu, and Taylor Armbruster"
+date: "`r Sys.Date()`"
+output: html_document
+resource_files:
+- TSA_template.Rmd
+- TSA_template.Rmd
+---
+
+test 
+<style type="text/css"> body, td {font-size: 12px;} code.r{font-size: 10px;} pre {font-size: 10px} </style>
+
+```{r, echo = F, warning=FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = F,warning = F,message = F, fig.width = 4, fig.height = 3,fig.align = "center",tidy = FALSE, strip.white = TRUE)
+library(RTL)
+library(plotly)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+#Morningstar API Login
+iuser = "morningstar.ctrd@ualberta.ca"
+ipassword = "oRakvwtPVg"
+```
+x
+**this template is a guide to organize your project in a clear manner**
+
+**quality of presentation refers amongst others to showing code, tables and charts in a manner that flows with your story. Details and computations shall remain in the code chunks without being rendered into the html output.**
+
+## Experimentation Part
+
+The main futures contracts used to trade ULSD will be the NY Harbor ULSD Futures. These contracts are standardized to 42,000 gallons (1,000 barrels). The ULSD delivery location is New York Harbor with options for delivery into the buyer's barge, tanker, or pipeline if they are able. The product must meet the specification of the Colonial Pipeline's Fungible Grade 62 for Ultra Low Sulfur Diesel and must be designated for sale in accordance with U.S. Environmental Protection Agency regulations.  
+
+NY Harbor ULSD Futures Handbook: https://www.cmegroup.com/content/dam/cmegroup/rulebook/NYMEX/1a/150.pdf  
+
+```{r}
+#Extracting the March and April Contracts
+df <- RTL::getPrices(
+  feed = "CME_NymexFutures_EOD",
+  contracts = c("@HO22H","@HO22J","@CL22H","@CL22J"),
+  from = "2019-08-01",
+  iuser = iuser,
+  ipassword = ipassword) 
+#Extracting the 1st and 2nd Contracts
+df2 <- RTL::getPrices(
+    feed = "CME_NymexFutures_EOD_continuous",
+    contracts = c("HO_001_Month","HO_002_Month","CL_001_Month","CL_002_Month"),
+    from = "2019-08-01",
+    iuser = iuser,
+    ipassword = ipassword)
+#Joining the Data Frames, converting to barrels, and calculating spreads
+HOdf <- dplyr::inner_join(df,df2) %>% 
+    dplyr::arrange(dplyr::desc(date)) %>% 
+  stats::na.omit()%>% 
+  dplyr::transmute(date = date,
+                   HO_01 = HO_001_Month * 42,
+                   HO_02 = HO_002_Month * 42,
+                   CL_01 = CL_001_Month,
+                   CL_02 = CL_002_Month,
+                   HO22H = HO22H * 42,
+                   HO22J = HO22J * 42,
+                   CL22H = CL22H,
+                   CL22J = CL22J,
+                   HO_c1c2_Spd = HO_01 - HO_02,
+                   HO_Apr22_Mar22_Spd = HO22H - HO22J,
+                   HO_Crack_Spd = HO22H - CL22H) %>% 
+#Converting from wide to long
+  tidyr::pivot_longer(-date, values_to = "Price", names_to = "Contracts")
+```
+
+```{r}
+#Plotting flat price for 1st and 2nd contracts
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "_0")) %>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~ Contracts,
+    type = 'scatter',
+    mode = 'lines'
+  ) %>% 
+  plotly::layout(
+    title = "Flat Price USLD vs. WTI", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+```{r}
+#Plotting flat price for March and April contracts 
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts,c("CL22H", "CL22J", "HO22H", "HO22J")))%>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~ Contracts,
+    type = 'scatter',
+    mode = 'lines'
+  ) %>% 
+  plotly::layout(
+    title = "Flat Price March & April", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+
+```{r}
+#Time spread 1st and 2nd contracts for ULSD
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "c1c2")) %>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "Time Spread: HO_01 vs HO_02", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+```{r}
+#Time spread for March and April ULSD contracts 
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "Apr")) %>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "Time Spread: March and April 2022", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+```{r}
+#Crack spread between ULSD and WTI
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "Crack")) %>% 
+  plotly::plot_ly(
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "ULSD Crack Spread: WTI March 2022", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+
+```
+
+
+**Disregard the sections below for the time being**
+
+## Summary
+
+### What's changed
+
+### Current Exposure
+
+### New Trades if any
+
+## Form a Market View
+
+### Supply Demand Indicators
+
+Build a SD balance dashboard to support forming and explaining a market view below.
+
+```{r}
+# You are expected to build your own SD balance from the EIA and other website APIs
+# The following is an example of series names for Crude SD components to get you going.
+# It is by no means a substitute for doing your own research
+library(RTL)
+data("tickers_eia")
+tickers_eia %>% dplyr::filter(product == "crude")
+```
+
++ Clearly laid out components of SD balances.
++ State why they matter.
++ Provide both long term and short term views. Your trade horizon is weekly - can you identify clearly from the chart when a change occurs?
+
+### Market View
+
++ View based on SD indicators ensuring that your conclusions are clearly readable from your charts.
++ Build analytics that is relevant to your current view.
++ If you have explored more, put them in an appendix. 
+
+## Desired Exposure
+
+Translating your market view into strength of market call and allocate risk versus maximum limit
+
++ Evidence of converting market view into a strength of market call.
++ Strength of market call translates into allocating risk allocation vs your limits.
+
+## Monetization Strategies
+
++ Evidence of exploring what we have covered in class.
++ How do you take those further with exploring various combinations along the grade, delivery location and delivery timing axis.
++ Diligence in being nimble in those in light of evolving market context.
+
+## Risk Appetite
+
++ Allocate risk in the context of risk reward ensuring capital preservation.
++ Evidence of a basic framework that you utilize to make your decision. Best is if you can articulate it clearly and quantify it.
+
+## Execution
+
++ What trades are you executing? 
++ Rationale stated clearly?
++ Entry/ Exit levels stated?
++ 
+
+## Profit and Loss ("PL" Attribution
+
+For each strategy:
+
++ Provide a grid of PL attribution by risk factors (flat price, time spread, crack,) 
++ Is it in line with your market call? Learnings...
+
+## Lessons Learned
+
+What have you learned from this project?
+
+## Questions for Weekly Meeting with Prof
+
+1. a...
+2. b...
+
+
+
+
+
+
