@@ -71,6 +71,7 @@ HOdf <- dplyr::inner_join(df,df2) %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts, "_0")) %>% 
   plotly::plot_ly(
+     width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~ Contracts,
@@ -90,6 +91,7 @@ HOdf %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts,c("CL22H", "CL22J", "HO22H", "HO22J")))%>% 
   plotly::plot_ly(
+     width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~ Contracts,
@@ -110,6 +112,7 @@ HOdf %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts, "c1c2")) %>% 
   plotly::plot_ly(
+     width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~Contracts
@@ -128,6 +131,7 @@ HOdf %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts, "Apr")) %>% 
   plotly::plot_ly(
+     width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~Contracts
@@ -146,6 +150,7 @@ HOdf %>%
 HOdf %>% 
   dplyr::filter(stringr::str_detect(Contracts, "Crack")) %>% 
   plotly::plot_ly(
+     width = 700, height = 400,
     x = ~date,
     y = ~Price,
     name = ~Contracts
@@ -159,41 +164,14 @@ HOdf %>%
   )
 ```
 
-
-```{r, eval=FALSE}
-#Weather Data - Relevant to ULSD
-#riem is the data package for weather data services
-#Still work in progress
-library(riem)
-
-nyc_weather <- riem::riem_measures(station = "NYC",
-                    date_start = "2010-01-01",
-                    date_end = Sys.Date()) %>% 
-  tidyr::separate(valid, c("date", "time"), sep = " ") %>% 
-  base::subset(select = c(date,tmpf)) %>% 
-  dplyr::group_by(date) %>% 
-  dplyr::mutate(temp = mean(tmpf)) %>% 
-  ungroup(date) %>% dplyr::select(-tmpf) %>% distinct() %>% 
-  stats::na.omit() %>% dplyr::mutate(date = as.Date(date))
-#Graphical Depication
-p <- nyc_weather %>% 
-  ggplot(aes(y = temp, x = date, col = temp, alpha = 1, show.legend = FALSE)) +
-  geom_point() + 
-  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
-  labs(
-    title = "NYC Temperature",
-    caption = "Source: IEM",
-    y = "Temperature (F)",
-    x = "")
-ggplotly(p)
-```
-
 ## Summary
 The main futures contracts used to trade ULSD will be the NY Harbor ULSD Futures (ticker HO). These contracts are standardized to 42,000 gallons (1,000 barrels). The ULSD delivery location is New York Harbor with options for delivery into the buyer's barge, tanker, or pipeline if they are able. The product must meet the specification of the Colonial Pipeline's Fungible Grade 62 for Ultra Low Sulfur Diesel and must be designated for sale in accordance with U.S. Environmental Protection Agency regulations. As of 2016, almost all petroleum-based diesel fuel available in the UK, mainland Europe, and North America is ultra low sulphur. 
 
 NY Harbor ULSD Futures Handbook: https://www.cmegroup.com/content/dam/cmegroup/rulebook/NYMEX/1a/150.pdf  
 
 ULSD is also commonly referred to as distillate and is the second-most consumed petroleum product in the United States. In addition to its use as a transportation fuel, distillate is also consumed for heating and power generation purposes. Distillate's use as a heating fuel drives the seasonal pattern of higher consumption during the winter months. Distillate consumption is affected by economic growth and weather conditions as well as vehicle efficiency and miles traveled of heavy-duty vehicles.
+
+Components of the price you see at the pumps: The cost of crude oil purchased by refineries, refining costs, distribution and marketing costs, and state taxes all influence the price you see at the pumps.
 
 ### What's changed
 
@@ -204,18 +182,8 @@ ULSD is also commonly referred to as distillate and is the second-most consumed 
 
 ### Supply Demand Indicators
 
-Production: Most of the diesel fuel produced and consumed in the US is refined from crude oil at petroleum refineries within the US. These refineries produce an average of 11 to 12 gallons of diesel fuel for every 42 gallon barrel of crude. Production decisions by refineries are also effected by the sprad between diesel and gasoline prices as when the spread widens refineries increase the amount of diesel that they produce relative to gasoline. The standard crack-spread at refineries is generally 3-2-1, meaning that for 3 barrels of crude that 2 will be refined into gasoline and 1 will be refined into ULSD.
-
-Consumption: More than 8 million mones in New Englad and the Central Atlantic Region of the US lack access to natural gas so they use Heating Oil (ULSD). This makes one of ULSD’s end markets consumers those who require ULSD for their home heating needs. Due to this there is some seasonality in pricing during the cold winter months. Residential heating oil consumption peaked in the 1970's and declined nearly every year since. 81%  of residential heating use is concentrated in the US Northeast including New York, Pennsylvania, and New England. Diesel is mainly used as a transport fuel and consumption is impacted by the underlying economic conditions, fuel efficiency, and miles traveled by heavy duty vehicles. In 2020, diesel fuel consumption was about 44.61 billion gallons which averages to about 122 million gallons per day. PADD 3 has been a net exported of diesel since 2001 which is logical given the number of refineries located in the US Gulf Coast and the fuel needs across the US. 
-
-Components of the price you see at the pumps: The cost of crude oil purchased by refineries, refining costs, distribution and marketing costs, and state taxes all influence the price you see at the pumps.
-
-Location Prices for Diesel: There are a few different geographic markets for diesel including Chicago ULSD, NYH ULSD, Gulf Coast ULSD, Los Angeles ULSD, Northwest Europe ULSD, and Singapore gasoil 500PPM.
-
-Transportation: Most diesel fuel moves by pipeline from refineries and ports to terminals near major consuming areas. Barges and trains also move diesel to terminals. Trucks transport the diesel fuel from the terminals to retail service stations and to large volume consumers such as fleet operators. 
 ```{r}
-# You are expected to build your own SD balance from the EIA and other website APIs
-# It is by no means a substitute for doing your own research
+#Implied storage builds and draws
 library(RTL)
 data("tickers_eia")
 sd <- tickers_eia %>% dplyr::filter(sd_category == "dist", category != "stocks") %>% 
@@ -226,37 +194,47 @@ eia_df <- tibble::tribble(~ticker, ~name) %>%
   dplyr::mutate(key = EIAkey) %>% 
   dplyr::mutate(df = purrr::pmap(list(ticker, key, name), .f = RTL::eia2tidy)) %>% 
   dplyr::select(df) %>% tidyr::unnest(df)
-  
-fig.title = "ULSD US SD Balance Components (kbd)"
 
-p1 <- eia_df %>% 
-  dplyr::filter(date >= "2015-01-01") %>% 
-  ggplot(aes(x = date, y = value, color = series)) +
-  geom_line() + 
-  scale_y_continuous(labels = comma) +
-  labs(title = fig.title, y = "kbd", x = "")
-p1 %>% ggplotly()
-```
-
-```{r}
-#Implied storage builds and draws
 data2 <- eia_df %>% 
   tidyr::pivot_wider(date, names_from = series, values_from = value) %>% 
   dplyr::rename(Demand = eia.mdist.demand, Imports = eia.mdist.imports, Supply = eia.mdist.supply, Exports = eia.mdist.exports) %>%   dplyr::arrange(date) %>% 
-  dplyr::filter(date >= "2015-01-01") %>% 
+  dplyr::filter(date >= "2018-01-01") %>% 
   tidyr::drop_na() %>% 
   dplyr::mutate(Storage = Supply + Imports - Demand - Exports)
 
 #Graphical Transformation
-fig.title = "Implied Storage Builds/Draws for ULSD"
+fig.title = "ULSD SD Balance Including Implied Storage Builds/Draws"
 p <- data2 %>% 
   tidyr::pivot_longer(-date, names_to = "series", values_to = "value") %>% 
   ggplot(aes(x = date, y = value, color = series)) + 
   geom_line() +
   scale_y_continuous(labels = scales::comma) +
   labs(title = fig.title, y = "kbd", x = "")
-p %>% plotly::ggplotly()
+p %>% plotly::ggplotly(width = 700, height = 400,)
 ```
+
+Production: Most of the diesel fuel produced and consumed in the US is refined from crude oil at petroleum refineries within the US. These refineries produce an average of 11 to 12 gallons of diesel fuel for every 42 gallon barrel of crude. Production decisions by refineries are also effected by the spread between diesel and gasoline prices as when the spread widens refineries increase the amount of diesel that they produce relative to gasoline. The standard crack-spread at refineries is generally 3-2-1, meaning that for 3 barrels of crude that 2 will be refined into gasoline and 1 will be refined into ULSD. In our SD balance Supply represents U.S. domestic production of ULSD. ULSD production is vitally important to the functioning of the U.S. economy as it is the dominant fuel for freight transportation and heavy machinery. 
+
+In the short term we believe that supply is relatively inelastic with production in the U.S. accounting for roughly 4.8 million barrels fo ULSD a day. In the longer term production is more elastic allowing refineries to increase the amount of ULSD that they produce if market conditions are accommodative. This would include higher ULSD prices from heightened demand. From our SD balance we can see the weekly changes in U.S. supply from refineries. 
+
+Consumption: More than 8 million hones in New England and the Central Atlantic Region of the US lack access to natural gas so they use Heating Oil (ULSD). This makes one of ULSD’s end markets consumers those who require ULSD for their home heating needs. Due to this there is some seasonality in pricing during the cold winter months. Residential heating oil consumption peaked in the 1970's and declined nearly every year since. 81%  of residential heating use is concentrated in the US Northeast including New York, Pennsylvania, and New England. Diesel is mainly used as a transport fuel and consumption is impacted by the underlying economic conditions, fuel efficiency, and miles traveled by heavy duty vehicles. In 2020, diesel fuel consumption was about 44.61 billion gallons which averages to about 3 million barrels per day. PADD 3 has been a net exported of diesel since 2001 which is logical given the number of refineries located in the US Gulf Coast and the fuel needs across the US. In our SD balance Demand represents the consumption of ULSD. Demand is important as it gives us a sense of the daily needs of the U.S. for heating and transportation. 
+
+In the short term we see demand increasing going into the holiday season as supply chain issues will require higher volumes of transport of freight across the US. Additionally, we are headed into the colder months of the year which will contribute to excess demand for home heating needs in the U.S. Northwest. In the longer term we believe that demand will stabilize following the winter season and after much of the U.S. supply chain congestion has been remedied. From our SD balance we are able to see weekly changes in the demand for ULSD. 
+
+Net Exports: The U.S. is a net exporter of ULSD meaning that they export far more ULSD than they import. This is important as domestic production is being directed to producing ULSD which will be sent internationally instead of for meeting domestic demand and building inventories. Our SD balance shows both imports and exports for the U.S. meaning that we can analyze them separately. International trade of ULSD is very important as ULSD is being redirected to outside markets instead of being used domestically and is materially important for analyzing inventory builds and draws.
+
+In the short term we believe that exports will decrease relative to imports to attempt and meet domestic needs during the winter months but that this reduction will be short-lived and is not likely to be enough to satisfy demand needs.
+
+Storage: Inventories of ULSD are vitally important in the U.S. as higher demand in the winter months due to home heating needs can cause inventory draws. Consistent draws can lead to lower inventories and will eventually put upward pressure on prices to attract ULSD to that market. Inventory draws and builds are shown in the SD balance as Storage. Generally, during the summer months and approaching the winter months the U.S. will build up inventories of ULSD in preparation for higher demand in the winter. 
+
+In 2021 it appears that due to high demand and exports relative to supply inventories were not built up. In the short term we expect that the lack of inventory builds will lead to higher prices for ULSD in the near term, especially in the later winter months closer to March. In the longer term as supply chain congestion is resolved and demand lessens for home heating we expect inventories to begin to build as they do typically. 
+
+Transportation: Most diesel fuel moves by pipeline from refineries and ports to terminals near major consuming areas. Barges and trains also move diesel to terminals. Trucks transport the diesel fuel from the terminals to retail service stations and to large volume consumers such as fleet operators. 
+
+Location Prices for Diesel: There are a few different geographic markets for diesel including Chicago ULSD, NYH ULSD, Gulf Coast ULSD, Los Angeles ULSD, Northwest Europe ULSD, and Singapore gasoil 500PPM.
+
+
+
 
 ```{r}
 #download and save weather data into local:
@@ -281,7 +259,7 @@ p %>% plotly::ggplotly()
 # write.table(weather,"PWM.csv",sep = ",")
 ```
 
-```{r}
+```{r eval=FALSE}
 #load data from csv files
 
 library(dplyr)
@@ -315,7 +293,7 @@ df_weather
 ```
 
 
-```{r weather}
+```{r eval=FALSE}
 #we need to analyze the temperature data for these 5 regions(New York,Pennsylvania,Massachusetts,Connecticut,Maine)
 
 fig.title = "Northeast Temperature"
@@ -358,10 +336,6 @@ ggplotly(p11)
 ```{r}
 prophet::prophet_plot_components(m, forecast)
 ```
-+ Clearly laid out components of SD balances.
-+ State why they matter.
-+ Provide both long term and short term views. Your trade horizon is weekly - can you identify clearly from the chart when a change occurs?
-
 ### Market View
 ```{r}
 #Pulling the Forward Curve for HO
@@ -377,6 +351,7 @@ HO_Curve <- RTL::getCurve(
   dplyr::mutate(Close = Close * 42)
 HO_Curve %>% 
   plot_ly(
+     width = 700, height = 400,
     x = ~contract,
     y = ~Close,
     type = "scatter",
@@ -402,7 +377,8 @@ eia_df <-
 data <- eia_df %>%
   dplyr::mutate(key = EIAkey) %>%
   dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
-  dplyr::select(param, type, data) %>% unnest()
+  dplyr::select(param, type, data) %>% unnest() %>% 
+  dplyr::filter(date>="2018-01-01")
 data
 
 p1 <-
@@ -411,11 +387,36 @@ p1 <-
   geom_line() +
   scale_y_continuous(labels = scales::comma) +
   ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
-p1 %>% plotly::ggplotly()
+p1 %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+```{r}
+#pulling in days of inventory of distillate
+eia_df <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "PET.W_EPD0_VSD_NUS_DAYS.W", "Value", "Source"
+  )
+eia_df
+data <- eia_df %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest() %>% 
+  dplyr::filter(date>="2018-01-01") %>% 
+  dplyr::select(c("series", "date", "value"))
+data
+
+p1 <-
+  data %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('U.S. Days of Supply of Total Distillate, Weekly')
+p1 %>% plotly::ggplotly(width = 700, height = 400,)
 ```
 + What we see currently in the ULSD market is that refinery output for the next few quarters is constrained with any increases in domestic US supply being the result of a decrease in net exports in the short-term. In this sense domestic supply is only expected to increase by ~300 thousand barrels a day going into the winter season. 
 + With supply accounted for we need to make some assumptions about demand in the short and long term. In the short term we expect to see higher demand as a result of the cold winter months and home heating requirements, along with a continue push to solve supply chain issues across the US which would require an increase in freight transport during the holiday shopping season. Each of these factors leads us to believe that demand for ULSD in the next few quarters will be strong and outstrip US supply in the near-term.
-```{r}
+```{r, eval=FALSE}
 Consumption <- read.csv(file = "~/Practice/consumption_distillate_retail_2.csv")
 p20 <- Consumption %>% group_by(YEAR) %>% group_by(quarter)
 Consumption %>% plot_ly() %>% add_trace(x = p20, y = ~distillate_fuel, type = 'bar', xaxis = ~YEAR, yaxis = "y", name = 'distillate_fuel') %>% add_trace(x = p20, y = ~heating_retail, type = "scatter", mode = "lines+markers", yaxis = "y2", name = 'heating_retail') %>% layout(yaxis = list(side = "left"), yaxis2 = list(side = "right", overlaying = "y"), showlegend = TRUE)
@@ -433,6 +434,7 @@ Consumption %>% plot_ly() %>% add_trace(x = p20, y = ~distillate_fuel, type = 'b
 +Going into the winter months we would expect to see inventories increasing but with the prolonged downward trend it appears that inventory builds will solely be driven by changes in net exports as supply from refineries appears to be inelastic. If demand in the US market during the winter months increases more than the change in net exports we can expect to see increases in inventory draws and decreases in days of distillate supply. 
 
 ## Desired Exposure
+
 
 Translating your market view into strength of market call and allocate risk versus maximum limit
 
