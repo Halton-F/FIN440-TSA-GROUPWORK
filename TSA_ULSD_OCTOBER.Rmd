@@ -325,6 +325,190 @@ ggplotly(p)
 ```
 
 ```{r}
+library(RTL)
+fig.title = "ULSD Trade Infrastructure Map"
+
+
+productspipelines <- RTL::getGIS(url = "https://www.eia.gov/maps/map_data/PetroleumProduct_Pipelines_US_EIA.zip")
+
+productsterminals <- RTL::getGIS(url = "https://www.eia.gov/maps/map_data/PetroleumProduct_Terminals_US_EIA.zip")
+
+refineries <- RTL::getGIS(url = "https://www.eia.gov/maps/map_data/Petroleum_Refineries_US_EIA.zip")
+
+require(leaflet)
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -96, lat = 35, zoom = 3) %>%
+  leaflet::addLegend(
+    "topleft",
+    colors = c("blue", "red", "green"),
+    labels = c("Refinery (with Cokers in black)", "Products Pipe", "Terminals"),
+    opacity = 0.8
+  ) %>%
+  addPolylines(
+    data = productspipelines,
+    color = "red",
+    weight = 0.8,
+    popup = ~ Pipename,
+    group = "Products Pipe"
+  ) %>%
+  addCircleMarkers(
+    data = refineries,
+    color =  ~ dplyr::case_when(Cokin_Mbpd > 0 ~ "black", TRUE ~ "blue"),
+    radius = ~ AD_Mbpd / 100,
+    popup = ~ paste0(Corp, "-", Site),
+    group = "Refinery"
+  ) %>%
+  addCircleMarkers(
+    data = productsterminals,
+    color = ~ "green",
+    radius = 1,
+    popup = ~ Site,
+    group = "Terminals"
+  ) %>%
+  addLayersControl(
+    overlayGroups = c("Refinery", "Products Pipe", "Terminals"),
+    options = layersControlOptions(collapsed = F)
+  )
+```
+
+```{r}
+require(tidyverse)
+require(purrr)
+require(RTL)
+
+eia_df <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "PET.WD0ST_R1X_1.W", "New England (PADD 1A )", "sink", 
+  "PET.WD0ST_R1Y_1.W", "Central Atlantic (PADD 1B)", "sink", 
+  "PET.WD0ST_R1Z_1.W", "Lower Atlantic (PADD 1C)", "sink", 
+  "PET.WD0ST_R20_1.W", "Midwest (PADD 2)", "sink", 
+  "PET.WD0ST_R30_1.W", "Gulf Coast (PADD 3)", "sink", 
+  "PET.WD0ST_R40_1.W", "Rocky Mountain (PADD 4)", "sink", 
+  "PET.WD0ST_R50_1.W", "West Coast (PADD 5)", "sink", 
+  )  # create a data frame with all the tickers 
+# create data pull function to access EIA API pull data and clean and convert data to the correct formation
+data <- eia_df %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest()
+data
+```
+```{r}
+fig.title = " Ending Stocks of Distillate Fuel Oil, 0 to 15 ppm Sulfur"
+library(scales)
+p1 <-
+  data %>% dplyr::filter(param %in% c("New England (PADD 1A )","Central Atlantic (PADD 1B)","Midwest (PADD 2)","Gulf Coast (PADD 3)","Rocky Mountain (PADD 4)","West Coast (PADD 5)")) %>%
+  ggplot(aes(x = date, y = value, color = param)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle(fig.title)
+p1 %>% plotly::ggplotly()
+```
+
+```{r}
+require(tidyverse)
+require(purrr)
+require(RTL)
+
+eia_df2 <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "PET.WD0IM_R10-Z00_2.W", "East Coast (PADD 1)", "source", 
+  "PET.WD0IM_R20-Z00_2.W", "Midwest (PADD 2)", "source",
+  "PET.WD0IM_R30-Z00_2.W", "Gulf Coast (PADD 3)", "source",
+  "PET.WD0IM_R40-Z00_2.W", "Rocky Mountain (PADD 4) ", "source",
+  "PET.WD0IM_R50-Z00_2.W", "West Coast (PADD 5) ", "source",
+  )  # create a data frame with all the tickers 
+# create data pull function to access EIA API pull data and clean and convert data to the correct formation
+
+data2 <- eia_df2 %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest()
+data2
+
+fig.title = "Import of Distillate Fuel Oil, 0 to 15 ppm Sulfur"
+library(scales)
+p1 <-
+  data %>% dplyr::filter(param %in% c("East Coast (PADD 1)","Midwest (PADD 2)","Gulf Coast (PADD 3)","Rocky Mountain (PADD 4) ","West Coast (PADD 5) ")) %>%
+  ggplot(aes(x = date, y = value, color = param)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle(fig.title)
+p1 %>% plotly::ggplotly()
+
+```
+
+```{r}
+require(tidyverse)
+require(purrr)
+require(RTL)
+
+eia_df3 <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "PET.WDIEXUS2.W", "U.S. Exports of Total Distillate", "output", 
+
+  )  # create a data frame with all the tickers 
+# create data pull function to access EIA API pull data and clean and convert data to the correct formation
+
+data3 <- eia_df3 %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest()
+data3
+
+fig.title = "Export of Distillate Fuel Oil, 0 to 15 ppm Sulfur"
+
+library(scales)
+p3 <-
+  data3  %>%
+  ggplot(aes(x = date, y = value, color = param)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle(fig.title)
+p3 %>% plotly::ggplotly()
+```
+
+
+```{r}
+require(tidyverse)
+require(purrr)
+require(RTL)
+
+eia_df5 <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "PET.MD0UP_R10_1.M", "East Coast (PADD 1)", "output", 
+"PET.MD0UP_R20_1.M", "Midwest (PADD 2)", "output",
+"PET.MD0UP_R30_1.M", "Gulf Coast (PADD 3)", "output",
+"PET.MD0UP_R40_1.M", "Rocky Mountain (PADD 4)", "output",
+"PET.MD0UP_R50_1.M", "West Coast (PADD 5) ", "output",
+  )  # create a data frame with all the tickers 
+# create data pull function to access EIA API pull data and clean and convert data to the correct formation
+
+data5 <- eia_df5 %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest()
+data5
+
+fig.title = "Product Supplied/Consumption of Distillate Fuel Oil, 0 to 15 ppm Sulfur"
+
+library(scales)
+p5 <-
+  data %>% dplyr::filter(param %in% c("East Coast (PADD 1)","Midwest (PADD 2)","Gulf Coast (PADD 3)","Rocky Mountain (PADD 4)","West Coast (PADD 5) ")) %>%
+  ggplot(aes(x = date, y = value, color = param)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle(fig.title)
+p5 %>% plotly::ggplotly()
+```
+
+
+```{r}
 library(prophet)
 
 p10 <- data2 %>% dplyr::select(date, Demand)%>%
