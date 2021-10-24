@@ -324,7 +324,7 @@ ggplotly(p)
 
 ```
 
-```{r}
+```{r, eval=FALSE}
 library(prophet)
 
 p10 <- data2 %>% dplyr::select(date, Demand)%>%
@@ -339,7 +339,7 @@ p11 <- plot(m, forecast, xlabel = "", ylabel = "kbd")
 ggplotly(p11)
 ```
 
-```{r}
+```{r, eval=FALSE}
 prophet::prophet_plot_components(m, forecast)
 ```
 ### Market View
@@ -385,7 +385,6 @@ data <- eia_df %>%
   dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
   dplyr::select(param, type, data) %>% unnest() %>% 
   dplyr::filter(date>="2018-01-01")
-data
 
 p1 <-
   data %>%
@@ -431,10 +430,11 @@ Consumption %>% plot_ly() %>% add_trace(x = p20, y = ~distillate_fuel, type = 'b
 
 
 Translating your market view into strength of market call and allocate risk versus maximum limit
-
-+ As we believe that demand will outstrip supply in the near term we expect to see prices rise in the next two quarters. This means that we expect to go long ULSD in the near term and if we are going to take a short position we would be taking that position outside of the nearest two quarters. We believe that the most likely timing of demand outstripping supply will occur during the winter season meaning that we will want to be long during this period. 
 + Evidence of converting market view into a strength of market call.
 + Strength of market call translates into allocating risk allocation vs your limits.
+
+As we believe that demand will outstrip supply in the near term we expect to see prices rise in the next two quarters. This means that we expect to go long ULSD in the near term and if we are going to take a short position we would be taking that position outside of the nearest two quarters. We believe that the most likely timing of demand outstripping supply will occur during the winter season meaning that we will want to be long during this period. 
+
 
 ## Monetization Strategies
 
@@ -476,20 +476,142 @@ t <- Comp_df %>%
   labs(title = fig.title, y = "Value", x = "")
  t %>% plotly::ggplotly(width = 700, height = 400,)
 ```
-From our analysis of days of supply and various strategies we found that only a few strategies appears to show some form of relationship with days of supply. There does not appear to be a discernible relationship between flat price and days of supply other than the slight lag consistent with producers stockpiling inventories at lower ULSD prices to profit off of future price increases. Time spreads appear to be at their most extreme during the first quarter of the year which is consistent with changes in seasonality at the end of winter. There does appear to be an inverse relationship between days of supply and time-spreads that can be observed when time spreads spike. In the cases of the 2014 and 2015 spikes in time spreads to the double digit range supplies reached a trough before building up again following the winter months. There also appears to be an inverse relationship between the crack spread and the number of days of supply. Generally, when days of supply of ULSD is high the crack spread is low which makes sense as large inventories of ULSD would decrease the price of ULSD relative to CL. Days of supply peaked during the early parts of the COVID-19 Pandemic and corresponds to a steep decline in the crack spread. 
-
-Given our market view that inventories will be pressured in the short-term due to lack of inventory builds prior to the winter we expect to see increases in both the crack and time spreads. At the time of writing the U.S. has roughly 31 days of supply and with the belief that this could go lower during the winter months if export reductions are not significant enough we could expect to see sub-30 days of supply which corresponds to crack spreads upwards of $26 in recent years and time spreads which could reach the low-to-mid teen range if demand is especially high during the end of the winter when inventories have been run down.  
 
 There are a few ways for us to profit off of our market call including making trades on flat price, time spread, and crack spread. With the historical volatility of flat price being quite high we would prefer to make trades based on other strategies. 
 We considered a time spread that was long a contract expiring within the next two quarters and being short a contract in the second quarter of 2022. This would mean that we would profit off of any increase in price in the near-term and price decreases following the winter months, aligning with our market view.
 
 We have also considered a strategy involving the crack spread where we would be long ULSD and short CL with the expectation that heightened demand in ULSD will increase the crack spread. This would also allow for possible changes in CL prices in the case that OPEC or US producers increased the supply of CL leading to decreases in the prices of both commodities. With the belief that demand and supply in the short-term for ULSD is relatively inelastic we would expect that price for ULSD to fall at a slower rate than CL in the near-term and for that difference in spread to balance out in the longer term following the holiday season. 
 
+From our analysis of days of supply and various strategies we found that only a few strategies appears to show some form of relationship with days of supply. There does not appear to be a discernible relationship between flat price and days of supply other than the slight lag consistent with producers stockpiling inventories at lower ULSD prices to profit off of future price increases. Time spreads appear to be at their most extreme during the first quarter of the year which is consistent with changes in seasonality at the end of winter. There does appear to be an inverse relationship between days of supply and time-spreads that can be observed when time spreads spike. In the cases of the 2014 and 2015 spikes in time spreads to the double digit range supplies reached a trough before building up again following the winter months. There also appears to be an inverse relationship between the crack spread and the number of days of supply. Generally, when days of supply of ULSD is high the crack spread is low which makes sense as large inventories of ULSD would decrease the price of ULSD relative to CL. Days of supply peaked during the early parts of the COVID-19 Pandemic and corresponds to a steep decline in the crack spread. 
+
+Given our market view that inventories will be pressured in the short-term due to lack of inventory builds prior to the winter we expect to see increases in both the crack and time spreads. At the time of writing the U.S. has roughly 31 days of supply and with the belief that this could go lower during the winter months if export reductions are not significant enough we could expect to see sub-30 days of supply which corresponds to crack spreads upwards of $26 in recent years and time spreads which could reach the low-to-mid teen range if demand is especially high during the end of the winter when inventories have been run down.  
+
+
 ## Risk Appetite
++ Allocate risk in the context of risk reward ensuring capital preservation.
++ Evidence of a basic framework that you utilize to make your decision. Best is if you can articulate it clearly and quantify it.
+```{r}
+tradeprocess <- RTL::getPrices(feed="CME_NymexFutures_EOD",contracts = c("@CL22H","@HO22J","@HO22H"),
+                          from = "2012-01-01",iuser = iuser, ipassword = ipassword) %>% stats::na.omit()
+
+df.long <-
+  tradeprocess %>% tidyr::pivot_longer(cols = -date,
+   names_to = "series",
+  values_to = "value") %>%
+  dplyr::mutate(value = case_when(
+    grepl("HO", series) ~ value * 42,
+    TRUE ~ value
+  ))
+
+# Plot into two panels using facet_grid
+fp <- df.long %>%
+  dplyr::filter(series == "HO22H") %>%
+  dplyr::mutate(PL = value - dplyr::lag(value)) %>%
+  stats::na.omit() %>%
+  dplyr::select(-series) %>%
+  tidyr::pivot_longer(cols = -date,
+                      names_to = "series",
+                      values_to = "value")
+
+# Plot into two panels using facet_grid
+fp1 <- fp %>%
+  ggplot(aes(x = date, y = value)) + geom_bar(col = "blue", stat = "identity") +
+  facet_grid(series ~ ., scales = "free_y") +
+  labs(
+    title = "Strategy::Flat Price",
+    subtitle = "Price Evolution and Risk/Reward",
+    caption = "Source: Morningstar/CME",
+    x = "",
+    y = "$ per bbl"
+  )
+fp1 %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+```{r}
+cx <- df.long %>%
+  dplyr::filter(series %in% c("HO22H", "CL22H")) %>%
+  tidyr::pivot_wider(names_from = series, values_from = value) %>% 
+  dplyr::transmute(
+    date = date,
+    value = HO22H - CL22H,
+    PL = value - dplyr::lag(value)
+  ) %>%
+  stats::na.omit() %>%
+  tidyr::pivot_longer(cols = -date,
+                      names_to = "series",
+                      values_to = "value")
+
+# Plot into two panels using facet_grid
+cx1 <- cx %>%
+  ggplot(aes(x = date, y = value)) + geom_bar(col = "blue", stat = "identity") +
+  facet_grid(series ~ ., scales = "free_y") +
+  labs(
+    title = "Strategy::March Crack Spread",
+    subtitle = "Price Evolution and Risk/Reward",
+    caption = "Source: Morningstar/CME",
+    x = "",
+    y = "$ per bbl"
+  )
+cx1 %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+```{r}
+struct <- df.long %>%
+  dplyr::filter(series %in% c("HO22J", "HO22H")) %>%
+  tidyr::pivot_wider(names_from = series, values_from = value) %>% 
+  dplyr::transmute(
+    date = date,
+    value = HO22H - HO22J,
+    PL = value - dplyr::lag(value)
+  ) %>%
+  stats::na.omit() %>%
+  tidyr::pivot_longer(cols = -date,
+                      names_to = "series",
+                      values_to = "value")
+
+# Plot into two panels using facet_grid
+Str <- struct %>%
+  ggplot(aes(x = date, y = value)) + geom_bar(col = "blue", stat = "identity") +
+  facet_grid(series ~ ., scales = "free_y") +
+  labs(
+    title = "Strategy::March - April Time Spread",
+    subtitle = "Price Evolution and Risk/Reward",
+    caption = "Source: Morningstar/CME",
+    x = "",
+    y = "$ per bbl"
+  )
+Str %>% plotly::ggplotly(width = 700, height = 400,)
+```
+```{r}
+# Using row bind (rbind) to concatenate long dfs 
+res <-
+  rbind(
+    fp %>% dplyr::filter(series != "value") %>% dplyr::mutate(series = "Flat Price"),
+    cx %>% dplyr::filter(series != "value") %>% dplyr::mutate(series = "Crack Spread"),
+    struct %>% dplyr::filter(series != "value") %>% dplyr::mutate(series = "Time Spread")
+  )
+
+Res <- res %>% ggplot(aes(x = value)) +
+  stat_density(mapping = (aes(y = ..scaled..)),
+               col = "blue",
+               fill = "blue") +
+  facet_grid(series ~ .) +
+  labs(
+    title = "Strategy PL Comparison",
+    caption = "Source: Morningstar",
+    x = "",
+    y = "$ per bbl"
+  )
+Res %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+Based on the distributions of each strategy it appears that the flat price strategy has the highest risk and the March - April 2022 time spread strategy has the lowest risk. The crack spread has much more moderate risk compared to the flat price strategy but has a much wider distribution than the time spread strategy. 
+
+We feel that the distribution and risk of the flat price strategy is too high for making trades and that the other two strategies have much more reasonable risk distributions. At this time we are comfortable starting with a higher risk, higher reward crack spread strategy and we will likely include the lower risk time spread strategy as a later trade. The crack spread strategy also exposes us to changes in the price of CL which contributes to the higher risk but also provides us the opportunity to benefit from possible increases in the supply of CL and the subsequent decrease in CL prices.
 
 ```{r}
 library(tibbletime)
-# Using RTL and Morningstar to retreive contract data
+# Using RTL and Morningstar to retrieve contract data
 df <-  RTL::getPrices(
   feed = "CME_NymexFutures_EOD_continuous",
   contracts = paste0("HO_", sprintf('%0.3d', 1:36), "_Month"),
@@ -512,8 +634,6 @@ df <- df %>%
 ## Pivot prices into a wide data frame
 prices <- df %>% dplyr::select(date, series, value) %>%
   tidyr::pivot_wider(values_from = value, names_from = series)
-prices
-
 ```
 
 
@@ -538,10 +658,10 @@ ret.adj <- RTL::rolladjust(
                       values_to = "value") %>%
   dplyr::mutate(series = "adj")
 ret.unajd <- ret_abs[, 1:2] %>% mutate(HO01 = cumsum(HO01))
-ret.unajd %>%
+ARoll <- ret.unajd %>%
   tidyr::pivot_longer(cols = -date,
                       names_to = "series",
-                      values_to = "value") %>%
+                      values_to = "value") %>% 
   rbind(ret.adj) %>%
   ggplot(aes(x = date, y = value, col = series)) + geom_line() +
   labs(
@@ -551,6 +671,7 @@ ret.unajd %>%
     x = "",
     y = "Cumulative Returns ($)"
   )
+ARoll %>% plotly::ggplotly(width = 700, height = 400,)
 ```
 
 ```{r}
@@ -574,7 +695,6 @@ x <- ret.log.adj %>%
     skewness = moments::skewness(value),
     .groups = "keep"
   )
-x
 ```
 
 ```{r}
@@ -584,7 +704,7 @@ sd.simple <- ret.log.adj %>%
   group_by(series) %>%
   dplyr::summarize(stddev = sd(value) * sqrt(252), .groups = "keep")
 
-sd.simple %>% ggplot(aes(x = series, y = stddev)) + geom_point(col = "blue") +
+SD.Simple <- sd.simple %>% ggplot(aes(x = series, y = stddev)) + geom_point(col = "blue") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_y_continuous(labels = percent) +
   labs(
@@ -593,15 +713,18 @@ sd.simple %>% ggplot(aes(x = series, y = stddev)) + geom_point(col = "blue") +
     x = "Contracts",
     y = "Annualized Percentage Volatility"
   )
+SD.Simple %>% plotly::ggplotly(width = 700, height = 400,)
 ```
 
 ```{r}
 fig.title = "Plotly Box Plot"
-ret.log.adj %>% plot_ly(
+ ret.log.adj %>% plot_ly(
   y = ~ value,
   color = ~ series,
   type = "box",
-  colors = c("blue", "orange")
+  colors = c("blue", "orange"),
+  width = 700,
+  height = 400
 )  %>%
   plotly::layout(
     title = list(text = fig.title, x = 0),
@@ -629,7 +752,9 @@ ret.roll %>% dplyr::filter(series %in% c("HO01", "HO06", "HO12", "HO36")) %>%
     x = ~ date,
     y = ~ sd20,
     name = ~ series,
-    color = ~ series
+    color = ~ series,
+    width = 700,
+  height = 400
   ) %>%
   plotly::add_lines() %>%
   plotly::layout(
@@ -647,7 +772,7 @@ ret.abs.adj <-
     rolltype = c("Last.Trade")
   )
 
-RTL::promptBeta(
+ RTL::promptBeta(
   x = ret.abs.adj,
   period = "all",
   betatype = "all",
@@ -678,7 +803,7 @@ df.corr <- df.corr %>%
   stats::na.omit()
 
 # Charting With Minimal Edits if adding more correlations
-df.corr %>% dplyr::select(date, contains("rho")) %>%
+ df.corr %>% dplyr::select(date, contains("rho")) %>%
   tidyr::pivot_longer(cols = -date,
                       names_to = "series",
                       values_to = "value") %>%
@@ -686,7 +811,9 @@ df.corr %>% dplyr::select(date, contains("rho")) %>%
     x = ~ date,
     y = ~ value,
     name = ~ series,
-    color = ~ series
+    color = ~ series,
+    width = 700,
+  height = 400
   ) %>%
   plotly::add_lines() %>%
   plotly::layout(
@@ -696,15 +823,19 @@ df.corr %>% dplyr::select(date, contains("rho")) %>%
   )
 ```
 
-+ Allocate risk in the context of risk reward ensuring capital preservation.
-+ Evidence of a basic framework that you utilize to make your decision. Best is if you can articulate it clearly and quantify it.
+
 
 ## Execution
 
 + What trades are you executing? 
 + Rationale stated clearly?
 + Entry/ Exit levels stated?
-+ 
+
+The first trade that we will be executing will be a crack spread strategy for March in which we are long ULSD and short CL. From our supply demand balance production of ULSD is quite inelastic in the short term and that and increases in domestic U.S. supply will have to be the result of a decrease in exports. Only slight and temporary decreases in exports are expected prior to the winter season so it is not likely that domestic inventories will build up enough to meet demand into the late winter. There was no build up of inventories in the Summer as would be typically suspected resulting in lower inventories going into the Fall with moderate draws of inventory already being realized leading to lower days of supply. We believe that higher demand during the winter season will be fueled by residential heating oil demand and freight transport needs over the holiday season with a continued effort to resolve U.S. supply chain bottlenecks leading to higher than average demand for ULSD. This will leads to draws on inventory which we anticipate will cause the crack spread between ULSD and CL to widen near to February and March as inventories have historically bottomed in those months. The relationship between days of supply and the crack spread appeared to be inverse in historical periods so based on our belief that we will see moderately lower days of inventory in the late winter we expect to profit off the widening of the crack spread. EIA forecasts show that inventories will be at their lowest point for the winter season in March and April which is why we decided to play the March crack spread. 
+
+This will be a longer term strategy that we would expect to pay off closer to the end of March depending on the severity of the winter weather at that time. We do expect to profit off of this trade as we move closer to March and as days of supply decrease after the initial builds due to the decline in ULSD exports. 
+
+Currently the crack spread for March 2022 is ~24 dollars per barrel which we believe is quite low given our expectations of continued inventory draws and lower days of supply during the Winter making the current spread an attractive entry point. Comparable days of supply to today have realized historical crack spreads between ~26 to ~40 dollars depending on the severity of the winter making this trade quite attractive. Trade exit would take place at a price in this range unless market conditions change materially. 
 
 ## Profit and Loss ("PL" Attribution
 
