@@ -837,6 +837,211 @@ This will be a longer term strategy that we would expect to pay off closer to th
 
 Currently the crack spread for March 2022 is ~24 dollars per barrel which we believe is quite low given our expectations of continued inventory draws and lower days of supply during the Winter making the current spread an attractive entry point. Comparable days of supply to today have realized historical crack spreads between ~26 to ~40 dollars depending on the severity of the winter making this trade quite attractive. Trade exit would take place at a price in this range unless market conditions change materially. 
 
+
+```{r}
+#Time spread for March and April ULSD contracts 
+
+
+
+df_crack_spread <- HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "Crack"))
+  
+p_cs <- df_crack_spread %>% ggplot(aes(x = date, y = Price)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma)
+p_cs %>% plotly::ggplotly(width = 700, height = 400,)
+
+
+df_flat <- HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts,c("CL22H")))
+
+p_flat <- df_flat %>% ggplot(aes(x = date, y = Price)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma)
+p_flat %>% plotly::ggplotly(width = 700, height = 400,)
+
+
+
+eia_df <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "STEO.DFPSPUS.M", "Inventory", "Source"
+  )
+df_Inventory <- eia_df %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest() %>% 
+  dplyr::filter(
+    (date>="2018-11-30")&(date<="2021-10-01")
+    )
+
+p_inv <-
+  df_Inventory %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+
+p_inv %>% plotly::ggplotly(width = 700, height = 400,)
+
+
+p_inv/p_cs
+  
+
+
+df_crack_spread <- df_crack_spread%>% 
+  mutate(
+    crack_spread = log(Price/lag(Price))
+  ) %>% 
+  na.omit() %>% 
+  select(date,crack_spread)
+
+
+
+df_Inventory <- df_Inventory %>% 
+  mutate(
+    Inventory = log(value/lag(value))
+  ) %>% 
+  na.omit()%>%
+  select(date,Inventory)  
+
+
+df_Inventory
+df_crack_spread
+
+df_merge <- left_join(df_crack_spread,df_Inventory) %>% 
+  tidyr::fill(Inventory) %>% 
+  na.omit()
+
+
+df_merge %>% ggplot(
+  aes(x = crack_spread, y = Inventory)
+                    )+geom_point()
+
+df_supply <- data2 %>% 
+  select(date,Supply) %>% 
+  filter(
+    (date>="2018-11-30")&(date<="2021-10-01")
+    ) %>% 
+  mutate(
+    Supply = log(Supply/lag(Supply))
+  ) %>% 
+  na.omit()
+
+df_merge2 <- left_join(df_crack_spread,df_supply) %>% 
+  tidyr::fill(Supply) %>% 
+  na.omit()
+
+
+fit <- stats::lm(crack_spread ~ Inventory, data = df_merge)
+# Returns an object of type list with all info
+# summary(fit), plot(fit)
+summary(fit)
+
+
+fit2 <- stats::lm(crack_spread ~ Supply, data = df_merge2)
+# Returns an object of type list with all info
+# summary(fit), plot(fit)
+summary(fit2)
+
+
+df_merge2 %>% ggplot(
+  aes(x = crack_spread, y = Supply)
+                    )+geom_point()
+
+```
+
+
+
+```{r}
+#Implied storage builds and draws
+library(RTL)
+data("tickers_eia")
+sd <- tickers_eia %>% dplyr::filter(sd_category == "dist", category != "stocks") %>% 
+dplyr::as_tibble()
+
+eia_df <- tibble::tribble(~ticker, ~name) %>% 
+  add_row(ticker = sd$tick.eia[1:nrow(sd)], name = sd$tick.r[1:nrow(sd)]) %>% 
+  dplyr::mutate(key = EIAkey) %>% 
+  dplyr::mutate(df = purrr::pmap(list(ticker, key, name), .f = RTL::eia2tidy)) %>% 
+  dplyr::select(df) %>% tidyr::unnest(df)
+
+data2 <- eia_df %>% 
+  tidyr::pivot_wider(date, names_from = series, values_from = value) %>% 
+  dplyr::rename(Demand = eia.mdist.demand, Imports = eia.mdist.imports, Supply = eia.mdist.supply, Exports = eia.mdist.exports) %>%   dplyr::arrange(date) %>% 
+  dplyr::filter(date >= "2018-11-30") %>% 
+  tidyr::drop_na() %>% 
+  dplyr::mutate(Storage = Supply + Imports - Demand - Exports)
+
+
+
+p_Storage <-
+  data2 %>%
+  ggplot(aes(x = date, y = Storage)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+
+p_Storage %>% plotly::ggplotly(width = 700, height = 400,)
+
+p_Supply <-
+  data2 %>%
+  ggplot(aes(x = date, y = Supply)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+
+p_Supply %>% plotly::ggplotly(width = 700, height = 400,)
+
+
+p_Imports <-
+  data2 %>%
+  ggplot(aes(x = date, y = Imports)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+
+p_Imports %>% plotly::ggplotly(width = 700, height = 400,)
+
+
+p_Demand <-
+  data2 %>%
+  ggplot(aes(x = date, y = Demand)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+
+p_Demand %>% plotly::ggplotly(width = 700, height = 400,)
+
+
+p_Exports <-
+  data2 %>%
+  ggplot(aes(x = date, y = Storage)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+
+p_Exports %>% plotly::ggplotly(width = 700, height = 400,)
+
+
+
+
+p_cs/p_Storage
+
+p_cs/p_Supply/p_Demand
+p_cs/p_Imports/p_Exports
+
+
+p_flat/p_Storage
+
+p_cs/p_flat
+```
+```{r}
+
+```
+
+```{r}
+
 ## Profit and Loss ("PL" Attribution
 
 For each strategy:
