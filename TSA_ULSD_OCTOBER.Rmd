@@ -145,7 +145,7 @@ HOdf %>%
 ```{r}
 #Crack spread between ULSD and WTI
 HOdf %>% 
-  dplyr::filter(stringr::str_detect(Contracts, "Crack")) %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "Crack_S")) %>% 
   plotly::plot_ly(
      width = 700, height = 400,
     x = ~date,
@@ -1079,7 +1079,7 @@ c1c2_Graph %>% plotly::ggplotly(width = 700, height = 400,)
 
 ```{r}
 #Prediction at current days of supply
-Days_Supply = data.frame(x = 30.4)
+Days_Supply = data.frame(x = 32.3)
 fit %>% stats::predict(newdata = Days_Supply,
                        interval = "prediction",
                        level = 0.99)
@@ -1087,12 +1087,50 @@ fit %>% stats::predict(newdata = Days_Supply,
 Using the regression results between the ULSD time spread and days of supply we can assess if the current time spread is reasonable based on the most recent reported days of supply. In this case the most recent values for days of supply is 30.4. When inputting this into the regression we find that the reasonable spread given a 99% confidence interval is between -0.81 and 0.96 while the current spread is roughly $0.64. The current market spread is within the confidence interval but is on the higher side of the distribution meaning that there is a smaller amount of upside potential based on the current days of supply and the regression.
 ```{r}
 #Prediction using potential days of supply
-Days_Supply = data.frame(x = 29.5)
+Days_Supply = data.frame(x = 32.3)
 fit %>% stats::predict(newdata = Days_Supply,
                        interval = "prediction",
                        level = 0.99)
 ```
 With the combination of our market view that the winter will increase inventory draws for the next two quarters we anticipate seeing declines in the days of ULSD supply. To get a sense of the potential time spread range we input 29.5 days of supply and saw that the potential upside by being long the time spread increased by roughly 14% based on a 95% confidence interval.  
+
+```{r}
+#Front Time Spread Risk
+
+struct <- c1c2_Reg %>%
+  dplyr::select(date, "HO_c1c2_Spd") %>% 
+  tidyr::pivot_longer(-date, names_to = "series", values_to = "value")
+
+# Plot into two panels using facet_grid
+Str <- struct %>%
+  ggplot(aes(x = date, y = value)) + geom_bar(col = "blue", stat = "identity") +
+  facet_grid(series ~ ., scales = "free_y") +
+  labs(
+    title = "Strategy::Front Time Spread",
+    subtitle = "Price Evolution and Risk/Reward",
+    caption = "Source: Morningstar/CME",
+    x = "",
+    y = "$ per bbl"
+  )
+Str %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+```{r}
+#Distribution
+Res <- struct %>% ggplot(aes(x = value)) +
+  stat_density(mapping = (aes(y = ..scaled..)),
+               col = "blue",
+               fill = "blue") +
+  facet_grid(series ~ .) +
+  labs(
+    title = "Long Front Time Spread Distribution",
+    caption = "Source: Morningstar",
+    x = "",
+    y = "$ per bbl"
+  )
+Res %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
 ```{r, eval=FALSE}
 #Regressing Days of Supply and Time Spread. With Roll adjustment
 spreads <- dflong %>%
@@ -1155,7 +1193,7 @@ c1c2_Reg %>% ggplot(aes(x = Days_Supply, y = c1c2, col = year)) +
 
 ```{r, eval=FALSE}
 #Prediction
-Days_Supply = data.frame(x = 30.4)
+Days_Supply = data.frame(x = 32.3)
 fit %>% stats::predict(newdata = Days_Supply,
                        interval = "prediction",
                        level = 0.99)
