@@ -191,13 +191,21 @@ Components of the price you see at the pumps: The cost of crude oil purchased by
 
 ### What's changed
 
+Following a meeting with Professor Cote we determined that the March - April crack spread was too risky and difficult to model leading us to reverse our exposure in those months. 
+
+There have been many instances of inventory draws over the past few months coupled with low storage from the Summer months. This lead us to believe that in the near term there would be limited likelihood that inventories would increase substantially prior to winter and that prices would continue to face upward pressure. In the last week we saw inventories build substantially in the U.S. leading to an increase in the days of supply available which contradicted our trading strategy that we entered into on November 1st. Due to these new developments we reversed our long time spread position and are now short the time spread given that inventories are now likely to build substancially going into Winter. 
+
 ### Current Exposure
 
-Our current exposure is long 15 contracts of ULSD in March and short 15 contracts of CL in March to take advantage of our expectations of crack spread widening at lower inventories during the month. 
+Our current exposure is short the time spread between the two closest contracts of ULSD based on the belief that rising inventory in the near-term will lead to lower prices in the closest contract. We are short 25 December ULSD contracts and long 25 January ULSD contracts.  
 
 ### New Trades
 
 November 1: When running regression analysis between the time spread of the two closest forward contracts and the days of inventory of ULSD we found that the current c1c2 time spread is on the higher side of the confidence interval. Given our market view that supply in the short-term will be inelastic relative to growing demand we anticipate continued storage draws leading to lower days of supply and a growing time spread. With days of supply falling to 30 or even less as the winter progresses the potential upside from monetizing the time spread could increase to above a dollar from its current 0.6 range in the market. To monetize this strategy we will be long 20 December 2021 and short 20 January 2022 ULSD contracts. The regression used for determining the reasonable range of the time spread based on historical data can be found in the Appendix. 
+
+November 8: Reversed our Long Crack Spread position due to recommendations that it is quite volatile and modelling is difficult to build and maintain. 
+
+November 9: As it appears that storage builds are increasing going into the winter months we have decided to reverse our long December - January time spread strategy and instead short the time spread as inventories are likely to build over the next few weeks. This will lead to higher days of supply in the near-term and will decrease any upside that was available from being long the time spread. We have instead decided to be short 25 December ULSD contracts and long 25 January ULSD contracts in an attempt to benefit from the rising inventory levels in the near-term and the downward pressure it should put on prices. 
 
 ### Supply Demand Indicators
 
@@ -1076,7 +1084,18 @@ c1c2_Graph <- c1c2_Reg %>% ggplot(aes(x = Days_Supply, y = HO_c1c2_Spd, col = ye
 c1c2_Graph %>% plotly::ggplotly(width = 700, height = 400,)
 
 ```
+The prediction below was used in determining the reasonability of our trade on November 1st. We used the most recently reported days of supply, 30.4 days, and the above regression to get a sense of the range of values for the time spread. 
+```{r}
+#Prediction for November 1 
+Days_Supply = data.frame(x = 30.4)
+fit %>% stats::predict(newdata = Days_Supply,
+                       interval = "prediction",
+                       level = 0.99)
+```
+The confidence interval on the regression is much larger than we would have expected but is likely caused by outlier values realized in 2020 during the COVID-19 Pandemic. Using the regression results between the ULSD time spread and days of supply we can assess if the current time spread is reasonable based on the most recent reported days of supply. In this case the most recent values for days of supply is 30.4. When inputting this into the regression we find that the reasonable spread given a 99% confidence interval is between -0.81 and 0.96 while the current spread is roughly $0.64. The current market spread is within the confidence interval but is on the higher side of the distribution meaning that there is a smaller amount of upside potential based on the current days of supply and the regression. With the expectation that days of supply will continue to decrease we could reasonably see more significant upside from a long time spread strategy. 
 
+
+The prediction below was used in determining the reasonability of our previous November 1st trade. We used the most recently reported days of supply, 32.3 days, and the previous regression to get a sense of the range of values for the time spread.
 ```{r}
 #Prediction at current days of supply
 Days_Supply = data.frame(x = 32.3)
@@ -1084,15 +1103,14 @@ fit %>% stats::predict(newdata = Days_Supply,
                        interval = "prediction",
                        level = 0.99)
 ```
-Using the regression results between the ULSD time spread and days of supply we can assess if the current time spread is reasonable based on the most recent reported days of supply. In this case the most recent values for days of supply is 30.4. When inputting this into the regression we find that the reasonable spread given a 99% confidence interval is between -0.81 and 0.96 while the current spread is roughly $0.64. The current market spread is within the confidence interval but is on the higher side of the distribution meaning that there is a smaller amount of upside potential based on the current days of supply and the regression.
-```{r}
+Using the regression results between the ULSD time spread and days of supply we can assess if the current time spread is reasonable based on the most recent reported days of supply. In this case the most recent values for days of supply is 32.3. When inputting this into the regression we find that the reasonable spread given a 99% confidence interval is between -0.916 and 0.868 while the current spread is roughly $0.57. The current market spread is within the confidence interval but is on the higher side of the distribution meaning that there is a smaller amount of upside potential based on the current days of supply and the regression. With inventories building in the near-term going into winter it is likely that days of supply will increase further decreasing any potential upside. With the likely decreasing upside we have decided to reverse our trade and instead take a short-position in the time spread. 
+```{r, eval=FALSE}
 #Prediction using potential days of supply
 Days_Supply = data.frame(x = 32.3)
 fit %>% stats::predict(newdata = Days_Supply,
                        interval = "prediction",
                        level = 0.99)
 ```
-With the combination of our market view that the winter will increase inventory draws for the next two quarters we anticipate seeing declines in the days of ULSD supply. To get a sense of the potential time spread range we input 29.5 days of supply and saw that the potential upside by being long the time spread increased by roughly 14% based on a 95% confidence interval.  
 
 ```{r}
 #Front Time Spread Risk
@@ -1123,7 +1141,7 @@ Res <- struct %>% ggplot(aes(x = value)) +
                fill = "blue") +
   facet_grid(series ~ .) +
   labs(
-    title = "Long Front Time Spread Distribution",
+    title = "Front Time Spread Distribution",
     caption = "Source: Morningstar",
     x = "",
     y = "$ per bbl"
