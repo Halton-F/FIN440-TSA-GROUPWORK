@@ -1216,3 +1216,256 @@ fit %>% stats::predict(newdata = Days_Supply,
                        interval = "prediction",
                        level = 0.99)
 ```
+
+
+## Appendix-Trading Model Based on the Spread between Capacity and Stock:
+```{r}
+
+library(tidyverse)
+library(purrr)
+library(RTL)
+library(dplyr)
+library(tibble)
+library(scales)
+
+eia_df <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "PET.WDIST1A1.W", "New England (PADD 1A )", "sink", 
+  "PET.WDIST1B1.W", "Central Atlantic (PADD 1B)", "sink", 
+  "PET.WDIST1C1.W", "Lower Atlantic (PADD 1C)", "sink", 
+  "PET.WDISTP11.W", "East Coast (PADD 1)", "sink",
+  "PET.WDISTP21.W", "Midwest (PADD 2)", "sink", 
+  "PET.WDISTP31.W", "Gulf Coast (PADD 3)", "sink", 
+  "PET.WDISTP41.W", "Rocky Mountain (PADD 4)", "sink", 
+  "PET.WDISTP51.W", "West Coast (PADD 5)", "sink", 
+  )  # create a data frame with all the tickers 
+# create data pull function to access EIA API pull data and clean and convert data to the correct formation
+
+EIAkey = "2a8946fed36919b63af3ff2f4bcaf83a"
+
+
+
+df_stock <- eia_df %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest() %>% 
+  filter(param %in% c("East Coast (PADD 1)")& (date >= "2011-01-01"))
+
+
+# df_stock
+
+
+fig.title = " Ending Stocks of Distillate Fuel Oil"
+
+p1 <-
+  df_stock %>% dplyr::filter(param %in% c("East Coast (PADD 1)","Midwest (PADD 2)","Gulf Coast (PADD 3)","Rocky Mountain (PADD 4)","West Coast (PADD 5)")) %>%
+  ggplot(aes(x = date, y = value, color = param)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle(fig.title)
+
+p1
+# p1 <-
+#   df_stock %>% dplyr::filter(param %in% c("East Coast (PADD 1)")& (date >= "2011-01-01")) %>%
+#   ggplot(aes(x = date, y = value, color = param)) +
+#   geom_line() +
+#   scale_y_continuous(labels = scales::comma) +
+#   ggtitle(fig.title)
+# 
+# p1
+
+```
+
+
+```{r}
+library(RTL)
+library(dplyr)
+
+df_capacity <- eiaStorageCap %>% 
+  filter(product == "distillates")
+
+df_capacity
+
+fig.title = "Capacity of Distillate Fuel Oil"
+p2 <-
+  df_capacity %>%
+  dplyr::filter(date >= "2011-01-01")%>%
+  ggplot(aes(x = date, y = value, color = product)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma)+ggtitle(fig.title)
+p2
+
+
+#adjust the data manually
+date_vector <-  c("2021-04-02","2020-04-03","2019-04-05","2019-10-04","2018-04-06","2018-10-05","2017-04-07","2017-10-06","2016-04-01","2016-10-07","2015-04-03","2015-10-02","2014-04-04","2014-10-03","2013-04-05","2013-10-04","2012-04-06","2012-10-05","2011-04-01","2011-10-07","2010-10-01") %>% as.Date(format = "%Y-%m-%d")
+
+df_capacity$date = date_vector
+
+
+```
+
+The stock for distillate in East Coast (PADD 1) accounts for the largest number and fluctuate seasonally. The only available data of capacity we can get from EIA API is from PADD 1, and no more information from any other PADDs. We can reasonably simplify our model by focus on the data in PADD 1 only.
+
+
+
+```{r}
+df_capacity_adj <- df_capacity %>% rename(
+    c("capacity"="value")
+    ) %>% 
+  select(date,capacity)
+
+df_stock_adj <- df_stock %>% rename(
+    c("stock"="value")) %>% 
+  select(date,stock)
+
+
+
+df_join <- df_stock_adj %>% 
+  arrange(date) %>% 
+  filter(date >= "2011-01-01") %>% 
+  dplyr::left_join(df_capacity_adj, by = "date") %>% 
+  fill(capacity) %>% na.omit()
+  
+  
+
+
+fig.title = "Capacity and Stock of Distillate Fuel Oil"
+
+df_join
+
+df_join %>% 
+  pivot_longer(-date, names_to = "series",values_to = "value" ) %>% 
+  ggplot(
+  aes(x = date, y = value, col = series))+
+  geom_line()+ggtitle(fig.title)
+
+```
+```{r}
+df_spread <- df_join %>% 
+  transmute(
+    date = date,
+    spread = capacity-stock
+  )
+
+
+fig.title = "Capacity and Stock of Distillate Fuel Oil"
+
+df_spread %>% ggplot(
+  aes(x = date, y = spread)
+) + 
+  geom_line()+ggtitle(fig.title)
+```
+The spread here means the difference between Capacity and Stock (capacity-stock)
+
+```{r}
+library(ggplot2)
+df_HO_c1c2_Spd <- HOdf %>% 
+  filter(Contracts == "HO_c1c2_Spd") %>% 
+  filter(date >= "2011-01-01") %>% 
+  select(date,Price)%>%
+  na.omit() %>% 
+  arrange(date) %>% 
+  rename(
+    c("HO_c1c2_Spd"="Price")
+    ) 
+
+df_HO_Apr22_Mar22_Spd<- HOdf %>% 
+  filter(Contracts == "HO_Apr22_Mar22_Spd") %>% 
+  filter(date >= "2011-01-01") %>% 
+  select(date,Price)%>%
+  na.omit() %>% 
+  arrange(date) %>% 
+  rename(
+    c("HO_Apr22_Mar22_Spd"="Price")
+    )
+
+df_HO_Crack_Spd<- HOdf %>% 
+  filter(Contracts == "HO_Crack_Spd") %>% 
+  filter(date >= "2011-01-01") %>% 
+  select(date,Price)%>%
+  na.omit() %>% 
+  arrange(date) %>% 
+  rename(
+    c("HO_Crack_Spd"="Price")
+    )
+
+
+df_join_all <-df_spread %>% 
+  dplyr::left_join(df_HO_c1c2_Spd, by = "date") %>% 
+  dplyr::left_join(df_HO_Apr22_Mar22_Spd, by = "date") %>% 
+  dplyr::left_join(df_HO_Crack_Spd, by = "date") %>% 
+  na.omit()
+
+df_join_all$HO_c1c2_Spd = scale(df_join_all$HO_c1c2_Spd)
+df_join_all$HO_Apr22_Mar22_Spd = scale(df_join_all$HO_Apr22_Mar22_Spd)
+df_join_all$HO_Crack_Spd = scale(df_join_all$HO_Crack_Spd)
+df_join_all$spread = scale(df_join_all$spread)
+
+
+df_join_all
+
+df_join_all_long <- df_join_all %>% pivot_longer(-date, names_to = "series",values_to = "value" ) %>% na.omit() 
+
+p3 <- df_join_all_long%>% 
+  ggplot(
+  aes(x = date, y = value,col = series)
+,width = 700, height = 400) + 
+  geom_line()
+
+p3
+```
+It looks like the Time Spread(HO_01 vs HO_02) does not have good trend with our spread. While, we do not trade on continuous spread but on the real contracts.  Then the Crack Spread and the Time Spread(Apr22 vs Mar22) would be check.
+```{r}
+fit1 <- stats::lm(HO_Crack_Spd ~ as.vector(spread), data = df_join_all)
+summary(fit1)
+
+
+```
+The result above indicates that the regression between HO_Crack_Spd ~ spread is really significant since F-statistic = 231.1 and R-squared = 0.6102.
+
+```{r}
+fit2 <- stats::lm(HO_Apr22_Mar22_Spd ~ as.vector(spread), data = df_join_all)
+summary(fit2)
+```
+
+
+
+The result above indicates that the regression between HO_Apr22_Mar22_Spd ~ spread is little  less significantly since F-statistic = 37.82 and R-squared = 0.2003.
+
+As a result, the spread could be a reasonable variable to trade on crack spread based on the spread between stock and capacity.
+
+
+```{r}
+df_join_all %>%
+  ggplot(aes(x = spread, y = HO_Crack_Spd, col = date)) +
+  geom_point() +
+    geom_smooth(method = "lm"
+
+  )
+
+
+
+```
+
+
+
+
+
+```{r}
+library(stats)
+
+
+
+new = data.frame(spread = 0.48782800)
+
+# utilization = as.matrix(utilization)
+
+fit1 %>% stats::predict.lm(newdata = new,
+                       interval = "prediction",
+                       level = 0.99)
+
+df_join_all
+```
+Here we can put the current spread value into the regression function to predict the HO_Crack_spread and compare that with the realistic level to  decide long or short the crack spread.
+
