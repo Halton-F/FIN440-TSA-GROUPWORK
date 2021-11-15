@@ -25,8 +25,6 @@ ipassword = "oRakvwtPVg"
 EIAkey = "7658ca55759776ff3116f4e3e927948e"
 ```
 
-## Experimentation Part
-
 Below are various charts that will be used as a quick dashboard for various monetization strategies. This includes flat price of ULSD and CL, as CL is a major component in ULSD production, the current crack spread between ULSD and CL, and the time spread between the first and second contract of ULSD.
 ```{r}
 #Extracting the March and April Contracts
@@ -772,14 +770,6 @@ For each strategy:
 ## Lessons Learned
 
 What have you learned from this project?
-
-## Questions for Weekly Meeting with Prof
-
-1. What is meant by the hedge ratio and what does it apply to? Is it just for hedging flat price changes or is it used in crack and time spread strategies?
-2.  In many cases when the fill function is used to replace missing values when using data that reports on different frequencies it results in horizontal lines in graphs and likely is not representative for use in regressions. Is there any way for us to extrapolate date in a better way for this other than copying a previous observation?
-3. How should we construct the P&L chart? Does the program we use to trade provide the historical P&L or do we need to update daily? Or is it total P&L from each strategy?
-4. What does the Z-Score represent in relation to seasonality?
-
 
 ## Appendix
 
