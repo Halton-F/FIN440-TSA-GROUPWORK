@@ -22,7 +22,7 @@ library(scales)
 #Morningstar API Login
 iuser = "morningstar.ctrd@ualberta.ca"
 ipassword = "oRakvwtPVg"
-EIAkey = "7658ca55759776ff3116f4e3e927948e"
+EIAkey = "2a8946fed36919b63af3ff2f4bcaf83a"
 ```
 
 Below are various charts that will be used as a quick dashboard for various monetization strategies. This includes flat price of ULSD and CL, as CL is a major component in ULSD production, the current crack spread between ULSD and CL, and the time spread between the first and second contract of ULSD.
@@ -1250,12 +1250,12 @@ fig.title = " Ending Stocks of Distillate Fuel Oil"
 
 p1 <-
   df_stock %>% dplyr::filter(param %in% c("East Coast (PADD 1)","Midwest (PADD 2)","Gulf Coast (PADD 3)","Rocky Mountain (PADD 4)","West Coast (PADD 5)")) %>%
-  ggplot(aes(x = date, y = value, color = param)) +
+  ggplot(aes(x = date, y = value, color = param),width = 700, height = 400) +
   geom_line() +
   scale_y_continuous(labels = scales::comma) +
   ggtitle(fig.title)
 
-p1
+p1 %>%  plotly::ggplotly(width = 700, height = 400,)
 # p1 <-
 #   df_stock %>% dplyr::filter(param %in% c("East Coast (PADD 1)")& (date >= "2011-01-01")) %>%
 #   ggplot(aes(x = date, y = value, color = param)) +
@@ -1271,7 +1271,7 @@ p1
 ```{r}
 library(RTL)
 library(dplyr)
-
+library(ggplot2)
 df_capacity <- eiaStorageCap %>% 
   filter(product == "distillates")
 
@@ -1281,10 +1281,10 @@ fig.title = "Capacity of Distillate Fuel Oil"
 p2 <-
   df_capacity %>%
   dplyr::filter(date >= "2011-01-01")%>%
-  ggplot(aes(x = date, y = value, color = product)) +
+  ggplot(aes(x = date, y = value, color = product),width = 700, height = 400) +
   geom_line() +
   scale_y_continuous(labels = scales::comma)+ggtitle(fig.title)
-p2
+p2%>%  plotly::ggplotly(width = 700, height = 400,)
 
 
 #adjust the data manually
@@ -1324,13 +1324,16 @@ fig.title = "Capacity and Stock of Distillate Fuel Oil"
 
 df_join
 
-df_join %>% 
+pj <- df_join %>% 
   pivot_longer(-date, names_to = "series",values_to = "value" ) %>% 
   ggplot(
-  aes(x = date, y = value, col = series))+
+  aes(x = date, y = value, col = series),width = 700, height = 400)+
   geom_line()+ggtitle(fig.title)
 
+pj %>% plotly::ggplotly(width = 700, height = 400,)
+
 ```
+
 ```{r}
 df_spread <- df_join %>% 
   transmute(
@@ -1341,15 +1344,17 @@ df_spread <- df_join %>%
 
 fig.title = "Capacity and Stock of Distillate Fuel Oil"
 
-df_spread %>% ggplot(
+ps <- df_spread %>% ggplot(
   aes(x = date, y = spread)
-) + 
+,width = 700, height = 400) + 
   geom_line()+ggtitle(fig.title)
+
+ps %>%  plotly::ggplotly(width = 700, height = 400,)
 ```
 The spread here means the difference between Capacity and Stock (capacity-stock)
 
 ```{r}
-library(ggplot2)
+
 df_HO_c1c2_Spd <- HOdf %>% 
   filter(Contracts == "HO_c1c2_Spd") %>% 
   filter(date >= "2011-01-01") %>% 
@@ -1403,7 +1408,7 @@ p3 <- df_join_all_long%>%
 ,width = 700, height = 400) + 
   geom_line()
 
-p3
+p3 %>% plotly::ggplotly(width = 700, height = 400,)
 ```
 It looks like the Time Spread(HO_01 vs HO_02) does not have good trend with our spread. While, we do not trade on continuous spread but on the real contracts.  Then the Crack Spread and the Time Spread(Apr22 vs Mar22) would be check.
 ```{r}
@@ -1427,15 +1432,15 @@ As a result, the spread could be a reasonable variable to trade on crack spread 
 
 
 ```{r}
-df_join_all %>%
-  ggplot(aes(x = spread, y = HO_Crack_Spd, col = date)) +
+pja <- df_join_all %>%
+  ggplot(aes(x = spread, y = HO_Crack_Spd, col = date),width = 700, height = 400) +
   geom_point() +
     geom_smooth(method = "lm"
 
   )
 
 
-
+pja %>% plotly::ggplotly(width = 700, height = 400,)
 ```
 
 
