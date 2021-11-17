@@ -1,6 +1,6 @@
 ---
 title: "TSA - ULSD"
-author: "Nathaniel McNalley, Fashuai Li, Hongtian Fu, and Taylor Armbruster"
+author: "Nathaniel McNalley, Hongtian Fu, Taylor Armbruster, and Fashuai Li"
 date: "`r Sys.Date()`"
 output: html_document
 resource_files:
@@ -12,6 +12,7 @@ resource_files:
 
 ```{r, echo = F, warning=FALSE, message = FALSE}
 knitr::opts_chunk$set(echo = F,warning = F,message = F, fig.width = 4, fig.height = 3,fig.align = "center",tidy = FALSE, strip.white = TRUE)
+
 library(RTL)
 library(plotly)
 library(dplyr)
@@ -19,166 +20,13 @@ library(ggplot2)
 library(tidyr)
 library(purrr)
 library(scales)
+
 #Morningstar API Login
 iuser = "morningstar.ctrd@ualberta.ca"
 ipassword = "oRakvwtPVg"
-EIAkey = "7658ca55759776ff3116f4e3e927948e"
+EIAkey = "2a8946fed36919b63af3ff2f4bcaf83a"
 ```
-
-Below are various charts that will be used as a quick dashboard for various monetization strategies. This includes flat price of ULSD and CL, as CL is a major component in ULSD production, the current crack spread between ULSD and CL, and the time spread between the first and second contract of ULSD.
-```{r}
-#Extracting the March and April Contracts
-df <- RTL::getPrices(
-  feed = "CME_NymexFutures_EOD",
-  contracts = c("@HO22H","@HO22J","@CL22H","@CL22J"),
-  from = "2010-01-01",
-  iuser = iuser,
-  ipassword = ipassword) 
-#Extracting the 1st and 2nd Contracts
-df2 <- RTL::getPrices(
-    feed = "CME_NymexFutures_EOD_continuous",
-    contracts = c("HO_001_Month","HO_002_Month","CL_001_Month","CL_002_Month"),
-    from = "2010-01-01",
-    iuser = iuser,
-    ipassword = ipassword)
-#Joining the Data Frames, converting to barrels, and calculating spreads
-HOdf <- dplyr::inner_join(df,df2) %>% 
-    dplyr::arrange(dplyr::desc(date)) %>% 
-  stats::na.omit()%>% 
-  dplyr::transmute(date = date,
-                   HO_01 = HO_001_Month * 42,
-                   HO_02 = HO_002_Month * 42,
-                   CL_01 = CL_001_Month,
-                   CL_02 = CL_002_Month,
-                   HO22H = HO22H * 42,
-                   HO22J = HO22J * 42,
-                   CL22H = CL22H,
-                   CL22J = CL22J,
-                   HO_Current_Crack = HO_01 - CL_01,
-                   HO_c1c2_Spd = HO_01 - HO_02,
-                   HO_Apr22_Mar22_Spd = HO22H - HO22J,
-                   HO_Crack_Spd = HO22H - CL22H) %>% 
-#Converting from wide to long
-  tidyr::pivot_longer(-date, values_to = "Price", names_to = "Contracts")
-```
-
-```{r}
-#Plotting flat price for 1st and 2nd contracts
-HOdf %>% 
-  dplyr::filter(stringr::str_detect(Contracts, "_0")) %>% 
-  plotly::plot_ly(
-     width = 700, height = 400,
-    x = ~date,
-    y = ~Price,
-    name = ~ Contracts,
-    type = 'scatter',
-    mode = 'lines'
-  ) %>% 
-  plotly::layout(
-    title = "Flat Price USLD vs. WTI", x = 0,
-  xaxis = list(title = "Date"),
-  yaxis = list(
-    title = "$ per Barrel")
-  )
-```
-```{r}
-#Plotting Current Crack Spread
-HOdf %>% 
-  dplyr::filter(stringr::str_detect(Contracts, "Current_Crack")) %>% 
-  plotly::plot_ly(
-     width = 700, height = 400,
-    x = ~date,
-    y = ~Price,
-    name = ~Contracts
-  ) %>% 
-  plotly::add_lines() %>% 
-  plotly::layout(
-    title = "Current ULSD Crack Spread", x = 0,
-  xaxis = list(title = "Date"),
-  yaxis = list(
-    title = "$ per Barrel")
-  )
-```
-```{r}
-#Time spread 1st and 2nd contracts for ULSD
-HOdf %>% 
-  dplyr::filter(stringr::str_detect(Contracts, "c1c2")) %>% 
-  plotly::plot_ly(
-     width = 700, height = 400,
-    x = ~date,
-    y = ~Price,
-    name = ~Contracts
-  ) %>% 
-  plotly::add_lines() %>% 
-  plotly::layout(
-    title = "Time Spread: HO_01 vs HO_02", x = 0,
-  xaxis = list(title = "Date"),
-  yaxis = list(
-    title = "$ per Barrel")
-  )
-```
-
-A dashboard for the March and April contracts is also included for the various monetization strategies as there is some seasonality in ULSD demand. This seasonality can lead to profitable trading strategies based on inventories at the end of March and into April. 
-
-```{r}
-#Plotting flat price for March and April contracts 
-HOdf %>% 
-  dplyr::filter(stringr::str_detect(Contracts, c("2H", "2J")))%>% 
-  plotly::plot_ly(
-     width = 700, height = 400,
-    x = ~date,
-    y = ~Price,
-    name = ~ Contracts,
-    type = 'scatter',
-    mode = 'lines'
-  ) %>% 
-  plotly::layout(
-    title = "Flat Price March & April Contracts", x = 0,
-  xaxis = list(title = "Date"),
-  yaxis = list(
-    title = "$ per Barrel")
-  )
-```
-
-```{r}
-#Crack spread between ULSD and WTI
-HOdf %>% 
-  dplyr::filter(stringr::str_detect(Contracts, "Crack_S")) %>% 
-  plotly::plot_ly(
-     width = 700, height = 400,
-    x = ~date,
-    y = ~Price,
-    name = ~Contracts
-  ) %>% 
-  plotly::add_lines() %>% 
-  plotly::layout(
-    title = "ULSD Crack Spread: WTI March 2022", x = 0,
-  xaxis = list(title = "Date"),
-  yaxis = list(
-    title = "$ per Barrel")
-  )
-```
-
-```{r}
-#Time spread for March and April ULSD contracts 
-HOdf %>% 
-  dplyr::filter(stringr::str_detect(Contracts, "Apr")) %>% 
-  plotly::plot_ly(
-     width = 700, height = 400,
-    x = ~date,
-    y = ~Price,
-    name = ~Contracts
-  ) %>% 
-  plotly::add_lines() %>% 
-  plotly::layout(
-    title = "Time Spread: March and April 2022", x = 0,
-  xaxis = list(title = "Date"),
-  yaxis = list(
-    title = "$ per Barrel")
-  )
-```
-
-## Summary
+### Summary
 The main futures contracts used to trade ULSD will be the NY Harbor ULSD Futures (ticker HO). These contracts are standardized to 42,000 gallons (1,000 barrels). The ULSD delivery location is New York Harbor with options for delivery into the buyer's barge, tanker, or pipeline if they are able. The product must meet the specification of the Colonial Pipeline's Fungible Grade 62 for Ultra Low Sulfur Diesel and must be designated for sale in accordance with U.S. Environmental Protection Agency regulations. As of 2016, almost all petroleum-based diesel fuel available in the UK, mainland Europe, and North America is ultra low sulphur. 
 
 NY Harbor ULSD Futures Handbook: https://www.cmegroup.com/content/dam/cmegroup/rulebook/NYMEX/1a/150.pdf  
@@ -186,30 +34,35 @@ NY Harbor ULSD Futures Handbook: https://www.cmegroup.com/content/dam/cmegroup/r
 ULSD is also commonly referred to as distillate and is the second-most consumed petroleum product in the United States. In addition to its use as a transportation fuel, distillate is also consumed for heating and power generation purposes. Distillate's use as a heating fuel drives the seasonal pattern of higher consumption during the winter months. Distillate consumption is affected by economic growth and weather conditions as well as vehicle efficiency and miles traveled of heavy-duty vehicles.
 
 Components of the price you see at the pumps: The cost of crude oil purchased by refineries, refining costs, distribution and marketing costs, and state taxes all influence the price you see at the pumps.
+Below are various charts that will be used as a quick dashboard for various monetization strategies. This includes flat price of ULSD and CL, as CL is a major component in ULSD production, the current crack spread between ULSD and CL, and the time spread between the first and second contract of ULSD.
 
 ### What's changed
 
 Following a meeting with Professor Cote we determined that the March - April crack spread was too risky and difficult to model leading us to reverse our exposure in those months. 
 
-There have been many instances of inventory draws over the past few months coupled with low storage from the Summer months. This lead us to believe that in the near term there would be limited likelihood that inventories would increase substantially prior to winter and that prices would continue to face upward pressure. In the last week we saw inventories build substantially in the U.S. leading to an increase in the days of supply available which contradicted our trading strategy that we entered into on November 1st. Due to these new developments we reversed our long time spread position and are now short the time spread given that inventories are now likely to build substancially going into Winter. 
+There have been many instances of inventory draws over the past few months coupled with low storage from the Summer months. This lead us to believe that in the near term there would be limited likelihood that inventories would increase substantially prior to winter and that prices would continue to face upward pressure. In the last week we saw inventories build substantially in the U.S. leading to an increase in the days of supply available which contradicted our trading strategy that we entered into on November 1st. Due to these new developments we reversed our long time spread position and are now short the time spread given that inventories are now likely to build substantially going into Winter. 
 
 ### Current Exposure
 
-Our current exposure is short the time spread between the two closest contracts of ULSD based on the belief that rising inventory in the near-term will lead to lower prices in the closest contract. We are short 25 December ULSD contracts and long 25 January ULSD contracts.  
+Our current exposure is short the time spread between the two closest contracts of ULSD based on the belief that rising inventory in the near-term will lead to lower prices in the nearest contract compared to the 2nd contract due to higher demand later in the Winter months. We are short 250 December ULSD contracts and long 250 January ULSD contracts to monetize this belief. 
 
-### New Trades
+### Trades
 
-November 1: When running regression analysis between the time spread of the two closest forward contracts and the days of inventory of ULSD we found that the current c1c2 time spread is on the higher side of the confidence interval. Given our market view that supply in the short-term will be inelastic relative to growing demand we anticipate continued storage draws leading to lower days of supply and a growing time spread. With days of supply falling to 30 or even less as the winter progresses the potential upside from monetizing the time spread could increase to above a dollar from its current 0.6 range in the market. To monetize this strategy we will be long 20 December 2021 and short 20 January 2022 ULSD contracts. The regression used for determining the reasonable range of the time spread based on historical data can be found in the Appendix. 
+October 22: Based on our initial market view that inventory levels going into the winter months would be insufficient to meet increased demand levels we chose to go long the March crack spread in anticipation of ULSD price appreciation relative to CL. We were long 15 contracts of ULSD and short 15 contracts of CL. 
 
-November 8: Reversed our Long Crack Spread position due to recommendations that it is quite volatile and modelling is difficult to build and maintain. 
+October 29: When running regression analysis between the time spread of the two closest forward contracts and the days of inventory of ULSD we found that the current c1c2 time spread is on the higher side of the confidence interval. Given our market view that supply in the short-term will be inelastic relative to growing demand we anticipate continued storage draws leading to lower days of supply and a growing time spread. With days of supply falling to 30 or even less as the winter progresses the potential upside from monetizing the time spread could increase to above a dollar from its current 0.6 range in the market. To monetize this strategy we will be long 20 December 2021 and short 20 January 2022 ULSD contracts. The regression used for determining the reasonable range of the time spread based on historical data can be found in the Appendix. 
 
-November 9: As it appears that storage builds are increasing going into the winter months we have decided to reverse our long December - January time spread strategy and instead short the time spread as inventories are likely to build over the next few weeks. This will lead to higher days of supply in the near-term and will decrease any upside that was available from being long the time spread. We have instead decided to be short 25 December ULSD contracts and long 25 January ULSD contracts in an attempt to benefit from the rising inventory levels in the near-term and the downward pressure it should put on prices. 
+November 5: Reversed our Long Crack Spread position due to high volatile and difficulty in building and maintaining a sustainable model.
 
-### Supply Demand Indicators
+November 8: Storage builds appear to be increasing going into the winter months so we have decided to reverse our long December - January time spread strategy and instead short the time spread as inventories are likely to build over the next few weeks. This will lead to higher days of supply in the near-term and will decrease any upside that was available from being long the time spread. We have instead decided to be short 25 December ULSD contracts and long 25 January ULSD contracts in an attempt to benefit from the rising inventory levels in the near-term and the downward pressure it should put on prices.
+
+November 11: Increased our position size for the short time spread strategy which we entered on November 9th. We are short a total of 250 December ULSD contracts and long 250 January ULSD contracts. 
+
+### Supply Demand Balance
 
 ```{r}
 #Implied storage builds and draws
-library(RTL)
+
 data("tickers_eia")
 sd <- tickers_eia %>% dplyr::filter(sd_category == "dist", category != "stocks") %>% 
 dplyr::as_tibble()
@@ -227,193 +80,71 @@ data2 <- eia_df %>%
   tidyr::drop_na() %>% 
   dplyr::mutate(Storage = Supply + Imports - Demand - Exports)
 
-#Graphical Transformation
-fig.title = "ULSD SD Balance Including Implied Storage Builds/Draws"
-p <- data2 %>% 
+#Graphical Transformation Since 2018
+fig.title = "ULSD SD Balance with Implied Builds/Draws Since 2018"
+p1 <- data2 %>% 
   tidyr::pivot_longer(-date, names_to = "series", values_to = "value") %>% 
   ggplot(aes(x = date, y = value, color = series)) + 
   geom_line() +
   scale_y_continuous(labels = scales::comma) +
   labs(title = fig.title, y = "kbd", x = "")
-p %>% plotly::ggplotly(width = 700, height = 400,)
+p1 %>% plotly::ggplotly(width = 700, height = 400,)
+
+#Graphical Transformation Since 2021
+fig.title = "ULSD SD Balance with Implied Builds/Draws Since 2021"
+p2 <- data2 %>% 
+  dplyr::filter( date>= "2021-01-01") %>% 
+  tidyr::pivot_longer(-date, names_to = "series", values_to = "value") %>% 
+  ggplot(aes(x = date, y = value, color = series)) + 
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = fig.title, y = "kbd", x = "")
+p2 %>% plotly::ggplotly(width = 700, height = 400,)
 ```
 
 Production: Most of the diesel fuel produced and consumed in the US is refined from crude oil at petroleum refineries within the US. These refineries produce an average of 11 to 12 gallons of diesel fuel for every 42 gallon barrel of crude. Production decisions by refineries are also effected by the spread between diesel and gasoline prices as when the spread widens refineries increase the amount of diesel that they produce relative to gasoline. The standard crack-spread at refineries is generally 3-2-1, meaning that for 3 barrels of crude that 2 will be refined into gasoline and 1 will be refined into ULSD. In our SD balance Supply represents U.S. domestic production of ULSD. ULSD production is vitally important to the functioning of the U.S. economy as it is the dominant fuel for freight transportation and heavy machinery. 
 
-In the short term we believe that supply is relatively inelastic with production in the U.S. accounting for roughly 4.8 million barrels fo ULSD a day. In the longer term production is more elastic allowing refineries to increase the amount of ULSD that they produce if market conditions are accommodative. This would include higher ULSD prices from heightened demand. From our SD balance we can see the weekly changes in U.S. supply from refineries. 
+In the short term we believe that supply is relatively inelastic with production in the U.S. accounting for roughly 4.8 million barrels fo ULSD a day. In the longer term production is more elastic allowing refineries to increase the amount of ULSD that they produce if market conditions are accommodative. This would include higher ULSD prices from heightened demand. From our SD balance we can see the weekly changes in U.S. ULSD supplies. 
 
-Consumption: More than 8 million hones in New England and the Central Atlantic Region of the US lack access to natural gas so they use Heating Oil (ULSD). This makes one of ULSD’s end markets consumers those who require ULSD for their home heating needs. Due to this there is some seasonality in pricing during the cold winter months. Residential heating oil consumption peaked in the 1970's and declined nearly every year since. 81%  of residential heating use is concentrated in the US Northeast including New York, Pennsylvania, and New England. Diesel is mainly used as a transport fuel and consumption is impacted by the underlying economic conditions, fuel efficiency, and miles traveled by heavy duty vehicles. In 2020, diesel fuel consumption was about 44.61 billion gallons which averages to about 3 million barrels per day. PADD 3 has been a net exported of diesel since 2001 which is logical given the number of refineries located in the US Gulf Coast and the fuel needs across the US. In our SD balance Demand represents the consumption of ULSD. Demand is important as it gives us a sense of the daily needs of the U.S. for heating and transportation. 
+Consumption: More than 8 million hones in New England and the Central Atlantic Region of the US lack access to natural gas so they use Heating Oil (ULSD). This makes one of ULSD’s end markets consumers those who require ULSD for their home heating needs. Due to this there is some seasonality in pricing during the cold winter months. Residential heating oil consumption peaked in the 1970's and declined nearly every year since. 81%  of residential heating use is concentrated in the US Northeast including New York, Pennsylvania, and New England. Diesel is mainly used as a transport fuel and consumption is impacted by the underlying economic conditions, fuel efficiency, and miles traveled by heavy duty vehicles. In 2020, diesel fuel consumption was about 44.61 billion gallons which averages to about 3 million barrels per day. PADD 3 has been a net exported of diesel since 2001 which is logical given the number of refineries located in the US Gulf Coast and the fuel needs across the US. In our SD balance Demand represents the consumption of ULSD. Demand is important as it gives us a sense of the weekly needs of the U.S. for heating and transportation. 
 
-In the short term we see demand increasing going into the holiday season as supply chain issues will require higher volumes of transport of freight across the US. Additionally, we are headed into the colder months of the year which will contribute to excess demand for home heating needs in the U.S. Northwest. In the longer term we believe that demand will stabilize following the winter season and after much of the U.S. supply chain congestion has been remedied. From our SD balance we are able to see weekly changes in the demand for ULSD. 
+In the short term we see demand increasing going into the holiday season as supply chain issues will require higher volumes of transport of freight across the US. Additionally, we are headed into the colder months of the year which will contribute to excess demand for home heating needs in the U.S. Northeast. In the longer term we believe that demand will stabilize following the winter season and after much of the U.S. supply chain congestion has been remedied. From our SD balance we are able to see weekly changes in the demand for ULSD. 
 
 Net Exports: The U.S. is a net exporter of ULSD meaning that they export far more ULSD than they import. This is important as domestic production is being directed to producing ULSD which will be sent internationally instead of for meeting domestic demand and building inventories. Our SD balance shows both imports and exports for the U.S. meaning that we can analyze them separately. International trade of ULSD is very important as ULSD is being redirected to outside markets instead of being used domestically and is materially important for analyzing inventory builds and draws.
 
-In the short term we believe that exports will decrease relative to imports to attempt and meet domestic needs during the winter months but that this reduction will be short-lived and is not likely to be enough to satisfy demand needs.
+In the short term we believe that exports will decrease relative to imports to attempt and meet domestic needs during the winter months. In the longer term this pattern is likely to continue as exports will be rerouted to meet domestic demand needs. 
 
 Storage: Inventories of ULSD are vitally important in the U.S. as higher demand in the winter months due to home heating needs can cause inventory draws. Consistent draws can lead to lower inventories and will eventually put upward pressure on prices to attract ULSD to that market. Inventory draws and builds are shown in the SD balance as Storage. Generally, during the summer months and approaching the winter months the U.S. will build up inventories of ULSD in preparation for higher demand in the winter. 
 
-In 2021 it appears that due to high demand and exports relative to supply inventories were not built up. In the short term we expect that the lack of inventory builds will lead to higher prices for ULSD in the near term, especially in the later winter months closer to March. In the longer term as supply chain congestion is resolved and demand lessens for home heating we expect inventories to begin to build as they do typically. 
+In 2021 it appears that due to high demand and exports relative to supply inventories were not built up. In the short term we expect that the lack of inventory builds will lead to higher prices for ULSD in the near term, especially in the later winter months closer to March. In the longer term as supply chain congestion is resolved and demand lessens for home heating we expect inventories to begin to build as they would typically. 
 
 Transportation: Most diesel fuel moves by pipeline from refineries and ports to terminals near major consuming areas. Barges and trains also move diesel to terminals. Trucks transport the diesel fuel from the terminals to retail service stations and to large volume consumers such as fleet operators. Most of the U.S. refining capacity can be found in PADD 3 around the Gulf Coast and as such PADD 3 is a net exporter of ULSD. A large amount of demand in the colder winter months is located in PADD 1 and due to their low refining capacity they require imports of ULSD from refineries concentrated in PADD 3.
-```{r, eval=FALSE}
-#Infrastructure Mapping
-fig.title = "ULSD Trade Infrastructure Map"
-productspipelines <- RTL::getGIS(url = "https://www.eia.gov/maps/map_data/PetroleumProduct_Pipelines_US_EIA.zip")
-productsterminals <- RTL::getGIS(url = "https://www.eia.gov/maps/map_data/PetroleumProduct_Terminals_US_EIA.zip")
-refineries <- RTL::getGIS(url = "https://www.eia.gov/maps/map_data/Petroleum_Refineries_US_EIA.zip")
-
-```
 
 ### Market View
 
-The forward curve for ULSD is provided to get a sense of the state of the market. Currently, the market is in backwardation, meaning that futures prices are decreases with increases in delivery timing.
-```{r}
-#Pulling the Forward Curve for HO
-fig.title = "Heating Oil Futures Forward Curve"
-HO_Curve <- RTL::getCurve(
-  feed = "Crb_Futures_Price_Volume_And_Open_Interest",
-  contract = "HO",
-  date = "2021-10-29",
-  iuser = iuser,
-  ipassword = ipassword
-) %>% 
-  dplyr::select(c("contract", "Close")) %>% 
-  dplyr::mutate(Close = Close * 42)
-HO_Curve %>% 
-  plot_ly(
-     width = 700, height = 400,
-    x = ~contract,
-    y = ~Close,
-    type = "scatter",
-    mode = "markers",
-    name = "Forward Curve") %>% 
-  plotly::layout(
-    title = list(text = fig.title, x = 0),
-    xaxis = list(
-      title = "Contract",
-      categoryorder = "array",
-      categoryarray = ~ contract
-    ),
-    yaxis = list(title = "$ per bbl")
-  )
-```
-Both historical ULSD inventories and days of supply have been charted to get a sense of where the market currently is and how it has been trending. Distillate inventories are also forecasted by EIA so there are data points as far as the end of 2022. Days of supply metrics are all based on historically realized values and are updated weekly. 
-```{r}
-#Pulling Distillate inventories
-eia_df <- 
-  tibble::tribble(
-  ~ticker, ~param, ~type,
-  "STEO.DFPSPUS.M", "Inventory", "Source"
-  )
-data <- eia_df %>%
-  dplyr::mutate(key = EIAkey) %>%
-  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
-  dplyr::select(param, type, data) %>% unnest() %>% 
-  dplyr::filter(date>="2018-01-01")
+What we see currently in the ULSD market is that refinery output for the next few quarters is constrained with any increases in domestic US supply being the result of a decrease in net exports in the short-term. In this sense domestic supply is only expected to increase by ~300 thousand barrels a day going into the winter season. Currently the market is in backwardation, meaning that futures prices are decreasing with increases in delivery timing. The forward curve can be found in Appendix 1.
 
-p1 <-
-  data %>%
-  ggplot(aes(x = date, y = value)) +
-  geom_line() +
-  scale_y_continuous(labels = scales::comma) +
-  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
-p1 %>% plotly::ggplotly(width = 700, height = 400,)
-```
+With supply accounted for we need to make some assumptions about demand in the short and long term. In the short term we expect to see higher demand as a result of the cold winter months and home heating requirements, along with a continue push to solve supply chain issues across the US which would require an increase in freight transport during the holiday shopping season. Each of these factors leads us to believe that demand for ULSD in the next few quarters will be strong and outstrip US supply in the near-term. 
 
-```{r}
-#pulling in days of inventory of distillate
-eia_df <- 
-  tibble::tribble(
-  ~ticker, ~param, ~type,
-  "PET.W_EPD0_VSD_NUS_DAYS.W", "Value", "Source"
-  )
-days_supply <- eia_df %>%
-  dplyr::mutate(key = EIAkey) %>%
-  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
-  dplyr::select(param, type, data) %>% unnest(cols = c(data)) %>% 
-  dplyr::select(date, series, value)
+Going into the winter months we would expect to see inventories increasing but with the prolonged downward trend it appears that inventory builds will solely be driven by changes in net exports as supply from refineries appears to be inelastic. If demand in the US market during the winter months increases more than the change in net exports we can expect to see increases in inventory draws and decreases in days of distillate supply. 
 
-p1 <- days_supply %>%
-  dplyr::filter(date >= "2018-01-01") %>% 
-  ggplot(aes(x = date, y = value)) +
-  geom_line() +
-  scale_y_continuous(labels = scales::comma) +
-  ggtitle('Distillate Fuel Oil Days of Supply U.S, Weekly')
-p1 %>% plotly::ggplotly(width = 700, height = 400,)
-```
+US distillate oil days of supply has been on a downward trend since late January 2021 with less than 36 days of supply since August supporting the idea that inventories have not been able to build much going into winter.
 
-+ What we see currently in the ULSD market is that refinery output for the next few quarters is constrained with any increases in domestic US supply being the result of a decrease in net exports in the short-term. In this sense domestic supply is only expected to increase by ~300 thousand barrels a day going into the winter season. 
-+ With supply accounted for we need to make some assumptions about demand in the short and long term. In the short term we expect to see higher demand as a result of the cold winter months and home heating requirements, along with a continue push to solve supply chain issues across the US which would require an increase in freight transport during the holiday shopping season. Each of these factors leads us to believe that demand for ULSD in the next few quarters will be strong and outstrip US supply in the near-term. 
-```{r, eval=FALSE}
-Consumption <- read.csv(file = "~/Practice/consumption_distillate_retail_2.csv")
-p20 <- Consumption %>% group_by(YEAR) %>% group_by(quarter)
-Consumption %>% plot_ly() %>% add_trace(x = p20, y = ~distillate_fuel, type = 'bar', xaxis = ~YEAR, yaxis = "y", name = 'distillate_fuel') %>% add_trace(x = p20, y = ~heating_retail, type = "scatter", mode = "lines+markers", yaxis = "y2", name = 'heating_retail') %>% layout(yaxis = list(side = "left"), yaxis2 = list(side = "right", overlaying = "y"), showlegend = TRUE)
-```
-+ US distillate oil days of supply has been on a downward trend since late January 2021 with less than 36 days of supply since August. 
+Both historical ULSD inventories and days of supply have been charted to get a sense of current storage levels and how they have been trending. ULSD inventories are forecasted by EIA so there are data points as far as the end of 2022. Days of supply are based on realized values and are updated weekly and total inventories are reported monthly. Both charts can be found in Appendix 1. A chart was also created to illustrate the relationship between flat price, time spreads, and crack spreads in relation to days of supply and can be found in Appendix 4. 
 
-+ Going into the winter months we would expect to see inventories increasing but with the prolonged downward trend it appears that inventory builds will solely be driven by changes in net exports as supply from refineries appears to be inelastic. If demand in the US market during the winter months increases more than the change in net exports we can expect to see increases in inventory draws and decreases in days of distillate supply. 
+### Desired Exposure
 
+As we believe that demand will outstrip supply during the winter season we will want to be long during this period. With increased inelastic demand due to transport needs and higher demand due to heating oil needs in the winter coupled with limited inventory builds during the summer we should see higher inventory draws leading to lower days of supply. The anticipated downward trend in days of supply during the winter will likely be the catalyst for higher ULSD prices. To monetize our bullish market call we could use the following strategies:
 
-## Desired Exposure
+Flat Price: Long contracts of ULSD during the winter months to capitalize on higher demand and sustained inventory draws. The chart for the flat price of the closest ULSD contract can be found in Appendix 2.
 
-As we believe that demand will outstrip supply during the winter season we will want to be long during this period. With increased inelastic demand due to transport needs and higher demand due to heating oil needs in the winter coupled with limited inventory builds during the summer we should see higher inventory draws leading to lower days of supply. The anticipated downward trend in days of supply during the winter will likely be the catalyst for higher ULSD prices. In anticipation of these higher prices as inventories decline we could go long the flat price for ULSD, long ULSD and short CL, or long ULSD in a month and short ULSD in the following months. 
+Time Spread: Exposure to the difference between ULSD contracts with different delivery dates. Would involve taking a long position in nearer term contracts and a short position in ULSD contracts past March. The chart for the time spread of the closest two ULSD contracts and the March - April contracts can be found in Appendix 2. 
 
+Crack Spread: Would involve exposure to CL prices which is a major determinant in the price of ULSD. Establishing a long position in the crack spread with the belief that ULSD prices will appreciate relative to CL prices during the winter months. Most likely exposure taken in March as inventories are generally their lowest at the end of the winter and unexpected cold weather can lead to major increases in ULSD prices relative to CL. The March crack spread chart can be found in Appendix 2. 
 
-## Monetization Strategies
+### Monetization Strategies
 
-The chart below shows historical days of supply along with the three main monetization strategies of flat price, time spread, and crack spread. 
-
-```{r}
-#Putting together days of supply and price strategies (crack spread, time spread, flat price)
-#Extracting the 1st and 2nd Contracts
-df2 <- RTL::getPrices(
-    feed = "CME_NymexFutures_EOD_continuous",
-    contracts = c("HO_001_Month","HO_002_Month","CL_001_Month"),
-    from = "2010-01-01",
-    iuser = iuser,
-    ipassword = ipassword)
-#Joining the Data Frames, converting to barrels, and calculating spreads
- Comp_df <-  df2 %>%  dplyr::arrange(dplyr::desc(date)) %>% 
-  stats::na.omit()%>% 
-  dplyr::transmute(date = date,
-                   HO_01 = HO_001_Month * 42,
-                   HO_02 = HO_002_Month * 42,
-                   CL_01 = CL_001_Month,
-                   Time_Spread = HO_01 - HO_02,
-                   Crack_Spread = HO_01 - CL_01)
- 
-#Converting days of supply wider
-days_supply <- days_supply %>% 
-  tidyr::pivot_wider(names_from = series, values_from = value) %>% 
-  dplyr::rename(Days_Supply = PET.W_EPD0_VSD_NUS_DAYS.W)
- 
-#Put together and converting from wide to long
-Comp_df <- dplyr::inner_join(days_supply,Comp_df) %>% 
-  dplyr::select(-HO_02 & -CL_01) %>% 
-  dplyr::rename(Flat_Price = HO_01) %>% 
-  tidyr::pivot_longer(-date, values_to = "value", names_to = "series")
-
-fig.title = "Flat Price, Time Spread, and Crack Spread Compared to Days of Supply"
-t <- Comp_df %>% 
-  ggplot(aes(x = date, y = value, color = series)) + 
-  geom_line() +
-  scale_y_continuous(labels = scales::comma) +
-  labs(title = fig.title, y = "Value", x = "")
- t %>% plotly::ggplotly(width = 700, height = 400,)
-```
-
-There are a few ways for us to profit off of our market call including making trades on flat price, time spread, and crack spread. With the historical volatility of flat price being quite high we would prefer to make trades based on other strategies. 
-We considered a time spread that was long a contract expiring within the next two quarters and being short a contract in the second quarter of 2022. This would mean that we would profit off of any increase in price in the near-term and price decreases following the winter months, aligning with our market view.
-
-We have also considered a strategy involving the crack spread where we would be long ULSD and short CL with the expectation that heightened demand in ULSD will increase the crack spread. This would also allow for possible changes in CL prices in the case that OPEC or US producers increased the supply of CL leading to decreases in the prices of both commodities. With the belief that demand and supply in the short-term for ULSD is relatively inelastic we would expect that price for ULSD to fall at a slower rate than CL in the near-term and for that difference in spread to balance out in the longer term following the holiday season. 
-
-From our analysis of days of supply and various strategies we found that only a few strategies appears to show some form of relationship with days of supply. There does not appear to be a discernible relationship between flat price and days of supply other than the slight lag consistent with producers stockpiling inventories at lower ULSD prices to profit off of future price increases. Time spreads appear to be at their most extreme during the first quarter of the year which is consistent with changes in seasonality at the end of winter. There does appear to be an inverse relationship between days of supply and time-spreads that can be observed when time spreads spike. In the cases of the 2014 and 2015 spikes in time spreads to the double digit range supplies reached a trough before building up again following the winter months. There also appears to be an inverse relationship between the crack spread and the number of days of supply. Generally, when days of supply of ULSD is high the crack spread is low which makes sense as large inventories of ULSD would decrease the price of ULSD relative to CL. Days of supply peaked during the early parts of the COVID-19 Pandemic and corresponds to a steep decline in the crack spread. 
-
-Given our market view that inventories will be pressured in the short-term due to lack of inventory builds prior to the winter we expect to see increases in both the crack and time spreads. At the time of writing the U.S. has roughly 31 days of supply and with the belief that this could go lower during the winter months if export reductions are not significant enough we could expect to see sub-30 days of supply which corresponds to crack spreads upwards of $26 in recent years and time spreads which could reach the low-to-mid teen range if demand is especially high during the end of the winter when inventories have been run down.  
-
-
-## Risk Appetite
-Below are the charts used to determine the volatility and possible payoffs based on the three different monetization strategies. These focus on monetizing the March and April market call where we expect price appreciation of ULSD later in the winter months. 
+The three main monetization strategies mentioned in the desired exposure section above were as follows: long the flat price, long the time spread, and long the crack spread. To get a sense of the historical performance of these strategies the historical P/L and value charts for these strategies are included below. 
 ```{r}
 tradeprocess <- RTL::getPrices(feed="CME_NymexFutures_EOD",contracts = c("@CL22H","@HO22J","@HO22H"),
                           from = "2012-01-01",iuser = iuser, ipassword = ipassword) %>% stats::na.omit()
@@ -441,7 +172,7 @@ fp1 <- fp %>%
   ggplot(aes(x = date, y = value)) + geom_bar(col = "blue", stat = "identity") +
   facet_grid(series ~ ., scales = "free_y") +
   labs(
-    title = "Strategy::Flat Price",
+    title = "Strategy::March Flat Price",
     subtitle = "Price Evolution and Risk/Reward",
     caption = "Source: Morningstar/CME",
     x = "",
@@ -505,6 +236,10 @@ Str <- struct %>%
   )
 Str %>% plotly::ggplotly(width = 700, height = 400,)
 ```
+
+### Risk Appetite
+Distributions were also created to get a sense of the volatility of each of the strategies and for comparative purposes. The chart below compares the payoff distributions of each of the strategies. 
+
 ```{r}
 # Using row bind (rbind) to concatenate long dfs 
 res <-
@@ -527,9 +262,9 @@ Res <- res %>% ggplot(aes(x = value)) +
   )
 Res %>% plotly::ggplotly(width = 700, height = 400,)
 ```
-Based on the distributions of each strategy it appears that the flat price strategy has the highest risk and the March - April 2022 time spread strategy has the lowest risk. The crack spread has much more moderate risk compared to the flat price strategy but has a much wider distribution than the time spread strategy. 
+Based on the distributions of each strategy it appears that the flat price strategy has the highest risk and the March - April 2022 time spread strategy has the lowest risk. The crack spread has much more moderate risk compared to the flat price strategy but has a much wider distribution than the time spread strategy. The crack spread strategy would also expose us to changes in the price of CL which may be beneficial if there are increases in CL production leading to moderate price declines. 
 
-We feel that the distribution and risk of the flat price strategy is too high for making trades and that the other two strategies have much more reasonable risk distributions. At this time we are comfortable starting with a higher risk, higher reward crack spread strategy and we will likely include the lower risk time spread strategy as a later trade. The crack spread strategy also exposes us to changes in the price of CL which contributes to the higher risk but also provides us the opportunity to benefit from possible increases in the supply of CL and the subsequent decrease in CL prices.
+We feel that the distribution and risk of the flat price strategy is too high for making trades and that the other two strategies have much more reasonable risk distributions. At this time we are comfortable starting with a higher risk, higher reward crack spread strategy and we will likely include the lower risk time spread strategy as a later trade. 
 
 ```{r}
 library(tibbletime)
@@ -558,42 +293,12 @@ prices <- df %>% dplyr::select(date, series, value) %>%
   tidyr::pivot_wider(values_from = value, names_from = series)
 ```
 
-
 ```{r}
 ## Pivot returns into a wide data frame
 ret_abs <- df %>% dplyr::select(date, series, ret_abs) %>%
   tidyr::pivot_wider(values_from = ret_abs, names_from = series)
 ret_log <- df %>% dplyr::select(date, series, ret_log) %>%
   tidyr::pivot_wider(values_from = ret_log, names_from = series)
-```
-
-```{r, eval=FALSE}
-fig.title = "ULSD Front Contract Absolute Returns"
-ret.adj <- RTL::rolladjust(
-  x = ret_abs[, 1:2],
-  commodityname = c("cmeulsd"),
-  rolltype = c("Last.Trade")
-) %>%
-  mutate(CL01 = cumsum(HO01)) %>%
-  tidyr::pivot_longer(cols = -date,
-                      names_to = "series",
-                      values_to = "value") %>%
-  dplyr::mutate(series = "adj")
-ret.unajd <- ret_abs[, 1:2] %>% mutate(HO01 = cumsum(HO01))
-ARoll <- ret.unajd %>%
-  tidyr::pivot_longer(cols = -date,
-                      names_to = "series",
-                      values_to = "value") %>% 
-  rbind(ret.adj) %>%
-  ggplot(aes(x = date, y = value, col = series)) + geom_line() +
-  labs(
-    title = fig.title,
-    subtitle = "With and Without Roll Adjustment - series start diverging on the first expiry",
-    caption = "Source: CME",
-    x = "",
-    y = "Cumulative Returns ($)"
-  )
-ARoll %>% plotly::ggplotly(width = 700, height = 400,)
 ```
 
 ```{r}
@@ -618,6 +323,8 @@ x <- ret.log.adj %>%
     .groups = "keep"
   )
 ```
+
+Volatility in ULSD was found to decrease when the time to delivery increases. This makes sense as prices are more susceptible to changes in supply and demand in the near-term and less susceptible in the longer-term due to increased elasticity over time. The three charts below illustrate this relationship between delivery timing and volatility. 
 
 ```{r}
 fig.title = "Risk versus Time to Delivery"
@@ -686,6 +393,7 @@ ret.roll %>% dplyr::filter(series %in% c("HO01", "HO06", "HO12", "HO36")) %>%
   )
 ```
 
+Correlations between ULSD were also tested to get a sense of how much a change in the front contract can have on a contract one year and three years from now. The result is consistent with the findings of the previous volatility charts as closer contracts will have a higher correlation with one another when compared to two contracts with a wide gap in delivery timings. In the long term, supply and demand are more elastic meaning that consumers and producers can change their behaviors leading to more moderate price changes farther down the curve. In the near-term demand and supply are more inelastic so price changes are more volatile in response to immediate inventory levels and demand swings. Correlations between ULSD contracts are larger when the contract delivery dates are closer together and smaller when delivery times are farther apart. This means that time has a mitigating effect on the near-term price volatility of ULSD as closer contracts will move in line with one another but farther out contracts will not experience price volatility to the same extent. The chart below illustrates this relationship. 
 ```{r}
 ret.abs.adj <-
   RTL::rolladjust(
@@ -693,16 +401,6 @@ ret.abs.adj <-
     commodityname = c("cmeulsd"),
     rolltype = c("Last.Trade")
   )
-```
-
-```{r, eval=FALSE}
-#Beta chart
- RTL::promptBeta(
-  x = ret.abs.adj,
-  period = "all",
-  betatype = "all",
-  output = "chart"
-)
 ```
 
 ```{r}
@@ -749,187 +447,486 @@ df.corr <- df.corr %>%
     yaxis = list(title = fig.title, tickformat = ".2f")
   )
 ```
-The above charts are illustrating the relationship between contract volatility and the time to delivery of the contract. The most volatile contract is the front contract and as time to delivery increases the price volatility of the contract decreases. In the longer-term supply and demand are more elastic meaning that consumers and producers can change their behaviors leading to more moderate price changes farther down the curve. In the near-term demand and supply are more inelastic so price changes are more volatile in response to immediate inventory levels and demand swings. Correlations between ULSD contracts are larger when the contract delivery dates are closer together and smaller when delivery times are farther apart. This means that time has a mitigating effect on the near-term price volatility of ULSD as closer contracts will move in line with one another but farther out contracts will not experience price volatility to the same extent. 
 
+### Execution
 
-## Execution
-
-The first trade that we will be executing will be a crack spread strategy for March in which we are long ULSD and short CL. From our supply demand balance production of ULSD is quite inelastic in the short term and that and increases in domestic U.S. supply will have to be the result of a decrease in exports. Only slight and temporary decreases in exports are expected prior to the winter season so it is not likely that domestic inventories will build up enough to meet demand into the late winter. There was no build up of inventories in the Summer as would be typically suspected resulting in lower inventories going into the Fall with moderate draws of inventory already being realized leading to lower days of supply. We believe that higher demand during the winter season will be fueled by residential heating oil demand and freight transport needs over the holiday season with a continued effort to resolve U.S. supply chain bottlenecks leading to higher than average demand for ULSD. This will leads to draws on inventory which we anticipate will cause the crack spread between ULSD and CL to widen near to February and March as inventories have historically bottomed in those months. The relationship between days of supply and the crack spread appeared to be inverse in historical periods so based on our belief that we will see moderately lower days of inventory in the late winter we expect to profit off the widening of the crack spread. EIA forecasts show that inventories will be at their lowest point for the winter season in March and April which is why we decided to play the March crack spread. 
+October 22: The first trade that we will be executing will be a crack spread strategy for March in which we are long ULSD and short CL. From our supply demand balance production of ULSD is quite inelastic in the short term and that and increases in domestic U.S. supply will have to be the result of a decrease in exports. Only slight and temporary decreases in exports are expected prior to the winter season so it is not likely that domestic inventories will build up enough to meet demand into the late winter. There was no build up of inventories in the Summer as would be typically suspected resulting in lower inventories going into the Fall with moderate draws of inventory already being realized leading to lower days of supply. We believe that higher demand during the winter season will be fueled by residential heating oil demand and freight transport needs over the holiday season with a continued effort to resolve U.S. supply chain bottlenecks leading to higher than average demand for ULSD. This will leads to draws on inventory which we anticipate will cause the crack spread between ULSD and CL to widen near to February and March as inventories have historically bottomed in those months. The relationship between days of supply and the crack spread appeared to be inverse in historical periods so based on our belief that we will see moderately lower days of inventory in the late winter we expect to profit off the widening of the crack spread. EIA forecasts show that inventories will be at their lowest point for the winter season in March and April which is why we decided to long the March crack spread. 
 
 This will be a longer term strategy that we would expect to pay off closer to the end of March depending on the severity of the winter weather at that time. We do expect to profit off of this trade as we move closer to March and as days of supply decrease after the initial builds due to the decline in ULSD exports. 
 
-Currently the crack spread for March 2022 is ~24 dollars per barrel which we believe is quite low given our expectations of continued inventory draws and lower days of supply during the Winter making the current spread an attractive entry point. Comparable days of supply to today have realized historical crack spreads between ~26 to ~40 dollars depending on the severity of the winter making this trade quite attractive. Trade exit would take place at a price in this range unless market conditions change materially. This trade will involve 15 contracts for both ULSD and CL.
+Currently the crack spread for March 2022 is ~24 dollars per barrel which we believe is quite low given our expectations of continued inventory draws and lower days of supply during the Winter making the current spread an attractive entry point. Comparable days of supply to today have realized historical crack spreads between ~26 to ~40 dollars depending on the severity of the winter making this trade quite attractive. Trade exit would take place at a price in this range unless market conditions change materially. This trade will involve being long 15 contracts of ULSD and short 15 contracts of CL.
 
-## Profit and Loss
+October 29: When running regression analysis between the time spread of the two closest forward contracts and the days of inventory of ULSD we found that the current c1c2 time spread is on the higher side of the confidence interval. Given our market view that supply in the short-term will be inelastic relative to growing demand we anticipate continued storage draws leading to lower days of supply and a growing time spread. With days of supply falling to 30 or even less as the winter progresses the potential upside from monetizing the time spread could increase to roughly 0.99 from its current 0.6 range in the market. To monetize this strategy we will be long 20 December 2021 and short 20 January 2022 ULSD contracts. We will exit this position if the market changes dramatically, if storage builds unexpectedly increase, or if the spread reaches the higher end of our confidence interval $0.99. (The regression and prediction values can be found in Appendix 5. The monetization and risk distribution for the front time spread strategy can be found in Appendix 3. 
+November 5: We exited our long March crack spread position due to recommendations that it is quite volatile and difficult to build and maintain a reliable model.
 
-For each strategy:
+November 8: Storage builds have suddenly increased leading us to reevaluate our long time spread position. With new storage builds and increasing days of supply we decided to reverse our long December - January time spread and instead short the time spread as inventories are likely to build over the next few weeks leading decreases in price and our potential upside.
 
-+ Provide a grid of PL attribution by risk factors (flat price, time spread, crack,) 
-+ Is it in line with your market call? Learnings...
+November 11: We decided to increase our risk with regard to the short time spread that we initiated on November 8th resulting in a total of 250 contracts. 
 
-## Lessons Learned
+### Profit and Loss
 
-What have you learned from this project?
+Below are the profit and loss graphs for the two strategies that we deployed over the trading game. Neither strategies generated positive returns at this time but there were instances where we had paper profits for the time spread strategy. There is a large decline in profitability in the time spread strategy on November 11th as we entered significantly more contracts.
+Generally we learned that we needed to deploy much more risk than what we had been over the game.
+```{r}
+#Crack Spread P/L
+tradedate1 <- as.Date("2021-10-22")
+tradedate2 <- as.Date("2021-11-05")
 
-## Appendix
+ULSD_H <- getPrices(feed = "CME_NymexFutures_EOD",
+                    contracts = "@HO22H",
+                    from = tradedate1, iuser = iuser, ipassword = ipassword) %>% 
+          dplyr::filter(date <= tradedate2)
+CL_H <- getPrices(feed = "CME_NymexFutures_EOD",
+                    contracts = "@CL22H",
+                    from = tradedate1, iuser = iuser, ipassword = ipassword) %>% 
+          dplyr::filter(date <= tradedate2)
 
-```{r, eval=FALSE}
-#Extracting the 1st and 2nd Contracts
+#P and L on a single contract basis
+trade1 <- mutate(CL_H, shortat= 79.99, ULSD_H, longat = 2.487, LongPL = (ULSD_H$HO22H - longat)*42, ShortPL = (shortat - CL_H$CL22H), TotalPL =LongPL+ShortPL)
+
+#Total P and L on total trade
+Trade1 <- ggplot(trade1, aes(x=date,y=TotalPL*15)) +geom_line() +ggtitle("Long March Crackspread P/L") + ylab("profit/loss")+ scale_y_continuous(labels = comma)
+
+Trade1 %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+
+```{r}
+tradedate1 <- as.Date("2021-10-29")
+tradedate2 <- as.Date("2021-11-08")
+tradedate3 <- as.Date("2021-11-08")
+tradedate4 <- as.Date("2021-11-11")
+
+HOLong1 <- getPrices(feed = "CME_NymexFutures_EOD",
+                    contracts = "@HO21Z",
+                    from = tradedate1, iuser = iuser, ipassword = ipassword) %>% 
+          dplyr::filter(date <= tradedate2)
+
+HOShort1 <- getPrices(feed = "CME_NymexFutures_EOD",
+                    contracts = "@HO22F",
+                    from = tradedate1, iuser = iuser, ipassword = ipassword) %>% 
+          dplyr::filter(date <= tradedate2)
+
+HOLong2 <- getPrices(feed = "CME_NymexFutures_EOD",
+                    contracts = "@HO22F",
+                    from = tradedate3, iuser = iuser, ipassword = ipassword)
+
+HOShort2 <- getPrices(feed = "CME_NymexFutures_EOD",
+                    contracts = "@HO21Z",
+                    from = tradedate3, iuser = iuser, ipassword = ipassword) 
+
+HOLong3 <- getPrices(feed = "CME_NymexFutures_EOD",
+                    contracts = "@HO22F",
+                    from = tradedate4, iuser = iuser, ipassword = ipassword)
+
+HOShort3 <- getPrices(feed = "CME_NymexFutures_EOD",
+                    contracts = "@HO21Z",
+                    from = tradedate4, iuser = iuser, ipassword = ipassword) 
+
+date_range <- getPrices(feed = "CME_NymexFutures_EOD",
+                    contracts = "@HO21Z",
+                    from = tradedate1, iuser = iuser, ipassword = ipassword) %>% 
+                dplyr::select(date)
+
+
+#P and L for Initial Long Time Spread Trade
+trade2 <- mutate(HOLong1, longat= 2.5014, HOShort1, shortat = 2.4865, pl1 = ((HOLong1$HO21Z-longat)*42)*20, pl2 = ((shortat-HOShort1$HO22F)*42)*20, totalpl2=pl1+pl2) 
+
+#P and L for Initial Short Time Spread Trade
+trade3 <- mutate(HOLong2, longat= 2.501, HOShort2, shortat = 2.5153, pl1 = ((HOLong2$HO22F-longat)*42)*25, pl2 = ((shortat-HOShort2$HO21Z)*42)*25, totalpl3=pl1+pl2) 
+
+#P and L for Increased Risk on Time Spread Trade
+trade4 <- mutate(HOLong3, longat= 2.391, HOShort3, shortat = 2.3991, pl1 = ((HOLong3$HO22F-longat)*42)*225, pl2 = ((shortat-HOShort3$HO21Z)*42)*225, totalpl4=pl1+pl2) 
+
+trade2 <- dplyr::select(trade2, date, totalpl2)
+trade3 <- dplyr::select(trade3, date, totalpl3)
+trade4 <- dplyr::select(trade4, date, totalpl4)
+
+df <- dplyr::left_join(date_range,trade4) 
+df <- dplyr::left_join(df, trade3)
+df <- dplyr::left_join(df,trade2)
+
+df <- df %>% 
+  dplyr::group_by(date) 
+ df[is.na(df)] <- 0
+df <- df %>% dplyr::summarise(totalpl = sum(totalpl2+totalpl3+totalpl4))
+
+Trade2 <- ggplot(df, aes(x=date,y=totalpl)) +geom_line() + scale_y_continuous(labels = comma) +ggtitle("Time Spread Strategy P/L") + ylab("profit/loss")
+Trade2 %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+
+### Lessons Learned
+
+It is difficult but essential to keep on top of the market and your positions at all times. The market can change quite quickly and if your trades are stale you can end up getting hurt.
+
+Questions are an ever present part of learning and with an environment that is so large and quickly changing it is essential to ask questions. 
+
+### Appendicies
+
+### Appendix 1
+
+```{r}
+#Pulling the Forward Curve for HO
+fig.title = "Heating Oil Futures Forward Curve"
+HO_Curve <- RTL::getCurve(
+  feed = "Crb_Futures_Price_Volume_And_Open_Interest",
+  contract = "HO",
+  date = "2021-10-29",
+  iuser = iuser,
+  ipassword = ipassword
+) %>% 
+  dplyr::select(c("contract", "Close")) %>% 
+  dplyr::mutate(Close = Close * 42)
+HO_Curve %>% 
+  plot_ly(
+     width = 700, height = 400,
+    x = ~contract,
+    y = ~Close,
+    type = "scatter",
+    mode = "markers",
+    name = "Forward Curve") %>% 
+  plotly::layout(
+    title = list(text = fig.title, x = 0),
+    xaxis = list(
+      title = "Contract",
+      categoryorder = "array",
+      categoryarray = ~ contract
+    ),
+    yaxis = list(title = "$ per bbl")
+  )
+```
+
+```{r}
+#Pulling Distillate inventories
+eia_df <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "STEO.DFPSPUS.M", "Inventory", "Source"
+  )
+data <- eia_df %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest() %>% 
+  dplyr::filter(date>="2018-01-01")
+
+p1 <-
+  data %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil U.S. Total Inventory, Monthly')
+p1 %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+```{r}
+#pulling in days of supply of distillate
+eia_df <- 
+  tibble::tribble(
+  ~ticker, ~param, ~type,
+  "PET.W_EPD0_VSD_NUS_DAYS.W", "Value", "Source"
+  )
+days_supply <- eia_df %>%
+  dplyr::mutate(key = EIAkey) %>%
+  dplyr::mutate(data = purrr::map2(ticker, key, RTL::eia2tidy)) %>%
+  dplyr::select(param, type, data) %>% unnest(cols = c(data)) %>% 
+  dplyr::select(date, series, value)
+
+p1 <- days_supply %>%
+  dplyr::filter(date >= "2018-01-01") %>% 
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle('Distillate Fuel Oil Days of Supply U.S, Weekly')
+p1 %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+### Appendix 2
+
+```{r}
+#Extracting the March and April Contracts
 df <- RTL::getPrices(
+  feed = "CME_NymexFutures_EOD",
+  contracts = c("@HO22H","@HO22J","@CL22H","@CL22J"),
+  from = "2010-01-01",
+  iuser = iuser,
+  ipassword = ipassword) 
+#Extracting the 1st and 2nd Contracts
+df2 <- RTL::getPrices(
     feed = "CME_NymexFutures_EOD_continuous",
-    contracts = c("HO_001_Month","CL_001_Month"),
+    contracts = c("HO_001_Month","HO_002_Month","CL_001_Month","CL_002_Month"),
     from = "2010-01-01",
     iuser = iuser,
     ipassword = ipassword)
 #Joining the Data Frames, converting to barrels, and calculating spreads
-df.long <- df %>% 
+HOdf <- dplyr::inner_join(df,df2) %>% 
+    dplyr::arrange(dplyr::desc(date)) %>% 
   stats::na.omit()%>% 
   dplyr::transmute(date = date,
                    HO_01 = HO_001_Month * 42,
-                   CL_01 = CL_001_Month,)%>% 
+                   HO_02 = HO_002_Month * 42,
+                   CL_01 = CL_001_Month,
+                   CL_02 = CL_002_Month,
+                   HO22H = HO22H * 42,
+                   HO22J = HO22J * 42,
+                   CL22H = CL22H,
+                   CL22J = CL22J,
+                   HO_Current_Crack = HO_01 - CL_01,
+                   HO_c1c2_Spd = HO_01 - HO_02,
+                   HO_Apr22_Mar22_Spd = HO22H - HO22J,
+                   HO_Crack_Spd = HO22H - CL22H) %>% 
 #Converting from wide to long
   tidyr::pivot_longer(-date, values_to = "Price", names_to = "Contracts")
-
-
-df.prices <- df.long %>% 
-  dplyr::filter(grepl("CL_01|HO_01", Contracts)) %>% 
-  tidyr::drop_na()
-
-df.ret <- df.prices %>%
-  dplyr::group_by(Contracts) %>%
-  dplyr::mutate(ret = Price - dplyr::lag(Price)) %>%
-  stats::na.omit()
-
-df.ret.wide <- df.ret %>%
-  tidyr::pivot_wider(-Price, values_from = ret, names_from = Contracts) %>% 
-  dplyr::filter(!date %in% c(as.Date("2020-04-20"),as.Date("2020-04-21"), as.Date("2020-04-17"))) %>% 
-  tidyr::drop_na()
-
-fig.title = paste(colnames(df.ret.wide)[2],"vs",colnames(df.ret.wide)[3],"Relationship")
-# A Useful way to Set Equal Axis
-axis.lim <- df.ret.wide %>% select(-date) %>% max(abs(.))
-df.ret.wide %>%
-  ggplot(aes(x = CL_01, y = HO_01, col = date)) + geom_point() +
-  ylim(-axis.lim, axis.lim) + xlim(-axis.lim, axis.lim) +
-  labs(title = fig.title)
-
-fig.title = paste(colnames(df.ret.wide)[2],
-                  "vs",
-                  colnames(df.ret.wide)[3],
-                  "Relationship Model Fit")
-# Running the regression with the stats package
-fit <- stats::lm(HO_01 ~ CL_01, data = df.ret.wide)
-# Returns an object of type list with all info
-# summary(fit), plot(fit)
-summary(fit)
-
-
-# Package broom provides better outputs as data frames
-library(broom)
-broom::tidy(fit) %>% dplyr::mutate_if(is.numeric, round, 3)
-
-broom::glance(fit) %>% dplyr::mutate_if(is.numeric, round, 3)
-
-# Using broom to plot into ggplot
-axis.lim <- df.ret.wide %>% select(-date) %>% max(abs(.))
-
-broom::augment(fit) %>%
-  ggplot(aes(x = CL_01, y = HO_01)) + geom_point() +
-  stat_smooth(method = lm, formula = y ~ x,se = FALSE) +
-  stat_smooth(method = loess, formula = y ~ x,se = FALSE, col = "orange") +
-  ylim(-axis.lim, axis.lim) + xlim(-axis.lim, axis.lim) +
-  labs(title = fig.title, 
-       subtitle = "adding a non-linear fit helps us understand the nature of the relationship")
-
-library(ggfortify)
-# ggfortify is required for autoplot for use with an object returned from lm()
-autoplot(fit,size = 0.5)
 ```
 
-```{r, eval=FALSE}
-library(RTL)
-storage <- rbind(eiaStocks %>% dplyr::filter(series == "CrudeCushing"),
-            eiaStorageCap %>% dplyr::filter(series == "Cushing"))
+```{r}
+#Plotting flat price for 1st HO Contract
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "HO_01")) %>% 
+  dplyr::filter(date >= "2021-01-01") %>% 
+  plotly::plot_ly(
+     width = 700, height = 400,
+    x = ~date,
+    y = ~Price,
+    name = ~ Contracts,
+    type = 'scatter',
+    mode = 'lines'
+  ) %>% 
+  plotly::layout(
+    title = "Flat Price of USLD", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
 
-spreads <- dflong %>%
-  dplyr::filter(grepl("CL01|CL02", series)) %>% 
+```{r}
+#Time spread 1st and 2nd contracts for ULSD
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "c1c2")) %>% 
+  plotly::plot_ly(
+     width = 700, height = 400,
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "Time Spread: HO_01 vs HO_02", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+```{r}
+#Time spread for March and April ULSD contracts 
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "Apr")) %>% 
+  plotly::plot_ly(
+     width = 700, height = 400,
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "Time Spread: March and April 2022", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+```{r}
+#Crack spread between ULSD and WTI
+HOdf %>% 
+  dplyr::filter(stringr::str_detect(Contracts, "Crack_S")) %>% 
+  plotly::plot_ly(
+     width = 700, height = 400,
+    x = ~date,
+    y = ~Price,
+    name = ~Contracts
+  ) %>% 
+  plotly::add_lines() %>% 
+  plotly::layout(
+    title = "ULSD Crack Spread: WTI March 2022", x = 0,
+  xaxis = list(title = "Date"),
+  yaxis = list(
+    title = "$ per Barrel")
+  )
+```
+
+### Appendix 3
+```{r}
+#Front Time Spread Risk
+
+Reg <- dplyr::filter(HOdf, Contracts == "HO_c1c2_Spd") %>% 
+  dplyr::rename(value = "Price") %>% 
+  dplyr::rename(series = "Contracts") %>% 
   tidyr::pivot_wider(names_from = series, values_from = value) %>% 
-  dplyr::transmute(date, c1c2 = .[[2]] - .[[3]]) %>% 
-  tidyr::drop_na()
+  stats::na.omit()
 
-spreads <- RTL::rolladjust(x = spreads,commodityname = "cmewti",
-                           rolltype = c("Last.Trade"))
+days_supply <- days_supply %>% 
+  tidyr::pivot_wider(names_from = series, values_from = value) %>% 
+  dplyr::rename(Days_Supply = PET.W_EPD0_VSD_NUS_DAYS.W)
+ 
+c1c2_Reg <- dplyr::left_join(Reg, days_supply) %>% 
+  dplyr::arrange(date) %>% 
+  tidyr::fill(Days_Supply) %>% 
+  stats::na.omit() %>% 
+  dplyr::mutate(year = lubridate::year(date))
+struct <- c1c2_Reg %>%
+  dplyr::select(date, "HO_c1c2_Spd") %>% 
+  tidyr::pivot_longer(-date, names_to = "series", values_to = "value")
 
-spreads <- spreads %>% dplyr::filter(abs(c1c2) < 10)
-      
-dat <- storage %>%
-    tidyr::pivot_wider(names_from = series, values_from = value) %>%
-    dplyr::arrange(date) %>%
-    dplyr::rename(stocks = 2, capacity = 3) %>%
-    tidyr::fill(capacity) %>%
-    tidyr::drop_na() %>%
-    dplyr::mutate(utilization = stocks / capacity,
-                  year = lubridate::year(date)) %>%
-    dplyr::left_join(spreads %>% dplyr::select(date, c1c2)) %>%
-    tidyr::drop_na() 
+# Plot into two panels using facet_grid
+Str <- struct %>%
+  ggplot(aes(x = date, y = value)) + geom_bar(col = "blue", stat = "identity") +
+  facet_grid(series ~ ., scales = "free_y") +
+  labs(
+    title = "Strategy::Front Time Spread",
+    subtitle = "Price Evolution and Risk/Reward",
+    caption = "Source: Morningstar/CME",
+    x = "",
+    y = "$ per bbl"
+  )
+Str %>% plotly::ggplotly(width = 700, height = 400,)
+```
 
-dat %>% plotly::plot_ly(
-  x = ~ utilization ,
-  y = ~ c1c2,
+```{r}
+#Distribution
+Res <- struct %>% ggplot(aes(x = value)) +
+  stat_density(mapping = (aes(y = ..scaled..)),
+               col = "blue",
+               fill = "blue") +
+  facet_grid(series ~ .) +
+  labs(
+    title = "Front Time Spread Distribution",
+    caption = "Source: Morningstar",
+    x = "",
+    y = "$ per bbl"
+  )
+Res %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+### Appendix 4
+```{r}
+#Putting together days of supply and price strategies (crack spread, time spread, flat price)
+#Extracting the 1st and 2nd Contracts
+df2 <- RTL::getPrices(
+    feed = "CME_NymexFutures_EOD_continuous",
+    contracts = c("HO_001_Month","HO_002_Month","CL_001_Month"),
+    from = "2010-01-01",
+    iuser = iuser,
+    ipassword = ipassword)
+#Joining the Data Frames, converting to barrels, and calculating spreads
+ Comp_df <-  df2 %>%  dplyr::arrange(dplyr::desc(date)) %>% 
+  stats::na.omit()%>% 
+  dplyr::transmute(date = date,
+                   HO_01 = HO_001_Month * 42,
+                   HO_02 = HO_002_Month * 42,
+                   CL_01 = CL_001_Month,
+                   Time_Spread = HO_01 - HO_02,
+                   Crack_Spread = HO_01 - CL_01)
+ 
+#Put together and converting from wide to long
+Comp_df <- dplyr::inner_join(days_supply,Comp_df) %>% 
+  dplyr::select(-HO_02 & -CL_01) %>% 
+  dplyr::rename(Flat_Price = HO_01) %>% 
+  tidyr::pivot_longer(-date, values_to = "value", names_to = "series")
+
+fig.title = "Flat Price, Time Spread, and Crack Spread Compared to Days of Supply"
+t <- Comp_df %>% 
+  ggplot(aes(x = date, y = value, color = series)) + 
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = fig.title, y = "Value", x = "")
+ t %>% plotly::ggplotly(width = 700, height = 400,)
+```
+
+### Appendix 5
+
+```{r}
+#Regressing Days of Supply and Time Spread.
+Reg <- dplyr::filter(HOdf, Contracts == "HO_c1c2_Spd") %>% 
+  dplyr::rename(value = "Price") %>% 
+  dplyr::rename(series = "Contracts") %>% 
+  tidyr::pivot_wider(names_from = series, values_from = value) %>% 
+  stats::na.omit()
+
+c1c2_Reg <- dplyr::left_join(Reg, days_supply) %>% 
+  dplyr::arrange(date) %>% 
+  tidyr::fill(Days_Supply) %>% 
+  stats::na.omit() %>% 
+  dplyr::mutate(year = lubridate::year(date))
+
+c1c2_Reg %>% plotly::plot_ly(
+  x = ~ Days_Supply ,
+  y = ~ HO_c1c2_Spd,
   #name = ~ series,
   color = ~ year,
+  height = 400,
+  width = 700,
   type = "scatter",
   mode = "markers"
 ) %>%
   plotly::layout(
-    title = list(text = "Front Spread Structure ($)", x = 0),
-    xaxis = list(title = "Front Spread Market Structure vs Storage Utlization"),
-    yaxis = list(title = "Cushing Storage Utilization")
+    title = list(text = "Front Spread Market Structure vs Days of Storage", x = 0),
+    xaxis = list(title = "Days of Supply"),
+    yaxis = list(title = "Time Spread ($)")
   )
 ```
 
-```{r, eval=FALSE}
-library(splines2)
-dat <- dat %>% dplyr::filter(abs(c1c2) < 2)
-fit <-
-  lm(c1c2 ~ splines::bs(utilization,knots = c(.4,.7),
-                        degree = 3,
-                        intercept = FALSE),
-     data = dat)
+```{r}
+# Running the regression with the stats package
+c1c2_Reg <- c1c2_Reg %>% dplyr::filter(abs(HO_c1c2_Spd) < 2)
+fit <- lm(HO_c1c2_Spd ~ splines::bs(Days_Supply,knots = c(30,35), degree = 3, intercept = FALSE), data = c1c2_Reg)
 summary(fit)
 
 library(ggfortify)
 autoplot(fit, size = 0.5)
 
-```
-
-```{r, eval=FALSE}
-dat %>% ggplot(aes(x = utilization, y = c1c2, col = year)) +
+c1c2_Graph <- c1c2_Reg %>% ggplot(aes(x = Days_Supply, y = HO_c1c2_Spd, col = year)) +
   geom_point() + 
     geom_smooth(
     method = "lm",
     formula = y ~ splines::bs(
       x,
-      knots = c(0.4,0.7),
+      knots = c(30,35),
       degree = 3,
       intercept = T
     ),
     se = F,
     col = "red"
-  )
+  ) 
+c1c2_Graph %>% plotly::ggplotly(width = 700, height = 400,)
 
 ```
 
-```{r, eval=FALSE}
-#Making Prediction
-utilization = data.frame(x = 0.85)
-fit %>% stats::predict(newdata = utilization,
+```{r}
+#Prediction for November 1 
+Days_Supply = data.frame(x = 30.4)
+fit %>% stats::predict(newdata = Days_Supply,
                        interval = "prediction",
                        level = 0.99)
+```
+The confidence interval on the regression is much larger than we would have expected but is likely caused by outlier values realized in 2020 during the COVID-19 Pandemic. Using the regression results between the ULSD time spread and days of supply we can assess if the current time spread is reasonable based on the most recent reported days of supply. In this case the most recent values for days of supply is 30.4. When inputting this into the regression we find that the reasonable spread given a 99% confidence interval is between -0.80 and 0.99 while the current spread is roughly $0.64. The current market spread is within the confidence interval but is on the higher side of the distribution meaning that there is a smaller amount of upside potential based on the current days of supply and the regression. With the expectation that days of supply will continue to decrease we could reasonably see more significant upside from a long time spread strategy. 
 
+
+### Appendix 6
+
+```{r}
+#Prediction at current days of supply
+Days_Supply = data.frame(x = 32.3)
+fit %>% stats::predict(newdata = Days_Supply,
+                       interval = "prediction",
+                       level = 0.99)
 ```
 
+Using the regression results between the ULSD time spread and days of supply we can assess if the current time spread is reasonable based on the most recent reported days of supply. In this case the most recent values for days of supply is 32.3. When inputting this into the regression we find that the reasonable spread given a 99% confidence interval is between -0.916 and 0.868 while the current spread is roughly $0.57. The current market spread is within the confidence interval but with inventories building in the near-term going into winter it is likely that days of supply will increase further decreasing any potential upside.
 
+### Heating Degree Day and Demand Analysis
 ```{r}
 #Utilizing HDD and Forecast to Predict Inventory Levels and Potential Future Prices
 #HDD used is for the Middle Atlantic region of the US including NY and Pennsylvania. Should be representative for the New England region as well.
@@ -993,17 +990,6 @@ fig.title = "STL Stats"
 )
 ```
 
-```{r, eval=FALSE}
-#Z-Score
-fig.title = "Z Scores"
-RTL::chart_zscore(
-  df = df,
-  title = fig.title,
-  per = "yearweek",
-  output = "zscore",
-  chart = "seasons"
-)
-```
 
 ```{r}
 fig.title = "Seasonal"
@@ -1018,198 +1004,8 @@ fig.title = "Seasonal"
 
 From the STL analysis it appears that there is some consistent seasonality in the days of supply of ULSD. This seasonality appears to be quite strong and appears to coincide with months earlier in the year which is consistent with higher demand in the late winter leading to declines in days of supply. Days of supply appears to decline from January into March and then increases during the spring and summer as heating needs decline. This relationship appears to be consistent between years with the exception of 2020 as COVID-19 led to major unexpected increases in ULSD inventories. 
 
-```{r}
-#Regressing Days of Supply and Time Spread. No roll adjustment
-Reg <- dplyr::filter(HOdf, Contracts == "HO_c1c2_Spd") %>% 
-  dplyr::rename(value = "Price") %>% 
-  dplyr::rename(series = "Contracts") %>% 
-  tidyr::pivot_wider(names_from = series, values_from = value) %>% 
-  stats::na.omit()
-
-c1c2_Reg <- dplyr::left_join(Reg, days_supply) %>% 
-  dplyr::arrange(date) %>% 
-  tidyr::fill(Days_Supply) %>% 
-  stats::na.omit() %>% 
-  dplyr::mutate(year = lubridate::year(date))
-
-c1c2_Reg %>% plotly::plot_ly(
-  x = ~ Days_Supply ,
-  y = ~ HO_c1c2_Spd,
-  #name = ~ series,
-  color = ~ year,
-  height = 400,
-  width = 700,
-  type = "scatter",
-  mode = "markers"
-) %>%
-  plotly::layout(
-    title = list(text = "Front Spread Market Structure vs Days of Storage", x = 0),
-    xaxis = list(title = "Days of Supply"),
-    yaxis = list(title = "Time Spread ($)")
-  )
-```
-
-```{r}
-# Running the regression with the stats package
-c1c2_Reg <- c1c2_Reg %>% dplyr::filter(abs(HO_c1c2_Spd) < 2)
-fit <- lm(HO_c1c2_Spd ~ splines::bs(Days_Supply,knots = c(30,35), degree = 3, intercept = FALSE), data = c1c2_Reg)
-summary(fit)
-
-library(ggfortify)
-autoplot(fit, size = 0.5)
-
-c1c2_Graph <- c1c2_Reg %>% ggplot(aes(x = Days_Supply, y = HO_c1c2_Spd, col = year)) +
-  geom_point() + 
-    geom_smooth(
-    method = "lm",
-    formula = y ~ splines::bs(
-      x,
-      knots = c(30,35),
-      degree = 3,
-      intercept = T
-    ),
-    se = F,
-    col = "red"
-  ) 
-c1c2_Graph %>% plotly::ggplotly(width = 700, height = 400,)
-
-```
-The prediction below was used in determining the reasonability of our trade on November 1st. We used the most recently reported days of supply, 30.4 days, and the above regression to get a sense of the range of values for the time spread. 
-```{r}
-#Prediction for November 1 
-Days_Supply = data.frame(x = 30.4)
-fit %>% stats::predict(newdata = Days_Supply,
-                       interval = "prediction",
-                       level = 0.99)
-```
-The confidence interval on the regression is much larger than we would have expected but is likely caused by outlier values realized in 2020 during the COVID-19 Pandemic. Using the regression results between the ULSD time spread and days of supply we can assess if the current time spread is reasonable based on the most recent reported days of supply. In this case the most recent values for days of supply is 30.4. When inputting this into the regression we find that the reasonable spread given a 99% confidence interval is between -0.81 and 0.96 while the current spread is roughly $0.64. The current market spread is within the confidence interval but is on the higher side of the distribution meaning that there is a smaller amount of upside potential based on the current days of supply and the regression. With the expectation that days of supply will continue to decrease we could reasonably see more significant upside from a long time spread strategy. 
-
-
-The prediction below was used in determining the reasonability of our previous November 1st trade. We used the most recently reported days of supply, 32.3 days, and the previous regression to get a sense of the range of values for the time spread.
-```{r}
-#Prediction at current days of supply
-Days_Supply = data.frame(x = 32.3)
-fit %>% stats::predict(newdata = Days_Supply,
-                       interval = "prediction",
-                       level = 0.99)
-```
-Using the regression results between the ULSD time spread and days of supply we can assess if the current time spread is reasonable based on the most recent reported days of supply. In this case the most recent values for days of supply is 32.3. When inputting this into the regression we find that the reasonable spread given a 99% confidence interval is between -0.916 and 0.868 while the current spread is roughly $0.57. The current market spread is within the confidence interval but is on the higher side of the distribution meaning that there is a smaller amount of upside potential based on the current days of supply and the regression. With inventories building in the near-term going into winter it is likely that days of supply will increase further decreasing any potential upside. With the likely decreasing upside we have decided to reverse our trade and instead take a short-position in the time spread. 
-```{r, eval=FALSE}
-#Prediction using potential days of supply
-Days_Supply = data.frame(x = 32.3)
-fit %>% stats::predict(newdata = Days_Supply,
-                       interval = "prediction",
-                       level = 0.99)
-```
-
-```{r}
-#Front Time Spread Risk
-
-struct <- c1c2_Reg %>%
-  dplyr::select(date, "HO_c1c2_Spd") %>% 
-  tidyr::pivot_longer(-date, names_to = "series", values_to = "value")
-
-# Plot into two panels using facet_grid
-Str <- struct %>%
-  ggplot(aes(x = date, y = value)) + geom_bar(col = "blue", stat = "identity") +
-  facet_grid(series ~ ., scales = "free_y") +
-  labs(
-    title = "Strategy::Front Time Spread",
-    subtitle = "Price Evolution and Risk/Reward",
-    caption = "Source: Morningstar/CME",
-    x = "",
-    y = "$ per bbl"
-  )
-Str %>% plotly::ggplotly(width = 700, height = 400,)
-```
-
-```{r}
-#Distribution
-Res <- struct %>% ggplot(aes(x = value)) +
-  stat_density(mapping = (aes(y = ..scaled..)),
-               col = "blue",
-               fill = "blue") +
-  facet_grid(series ~ .) +
-  labs(
-    title = "Front Time Spread Distribution",
-    caption = "Source: Morningstar",
-    x = "",
-    y = "$ per bbl"
-  )
-Res %>% plotly::ggplotly(width = 700, height = 400,)
-```
-
-```{r, eval=FALSE}
-#Regressing Days of Supply and Time Spread. With Roll adjustment
-spreads <- dflong %>%
-  dplyr::filter(grepl("CL01|CL02", series)) %>% 
-  tidyr::pivot_wider(names_from = series, values_from = value) %>% 
-  dplyr::transmute(date, c1c2 = .[[2]] - .[[3]]) %>% 
-  tidyr::drop_na()
-
-spreads <- RTL::rolladjust(x = spreads,commodityname = "cmewti",
-                           rolltype = c("Last.Trade"))
-
-spreads <- spreads %>% dplyr::filter(abs(c1c2) < 10)
-
-Reg <- RTL::rolladjust(x = spreads,commodityname = "cmeulsd",
-                           rolltype = c("Last.Trade"))
-
-c1c2_Reg <- dplyr::left_join(Reg, days_supply) %>% 
-  dplyr::arrange(date) %>% 
-  tidyr::fill(Days_Supply) %>% 
-  stats::na.omit() %>% 
-  dplyr::mutate(year = lubridate::year(date))
-
-c1c2_Reg %>% plotly::plot_ly(
-  x = ~ Days_Supply ,
-  y = ~ c1c2,
-  #name = ~ series,
-  color = ~ year,
-  type = "scatter",
-  mode = "markers"
-) %>%
-  plotly::layout(
-    title = list(text = "Front Spread Market Structure vs Days of Storage", x = 0),
-    xaxis = list(title = "Days of Supply"),
-    yaxis = list(title = "Time Spread ($)")
-  )
-```
-
-```{r, eval=FALSE}
-# Running the regression with the stats package
-c1c2_Reg <- c1c2_Reg %>% dplyr::filter(abs(c1c2) < 2)
-fit <- lm(c1c2 ~ splines::bs(Days_Supply,knots = c(30,35), degree = 3, intercept = FALSE), data = c1c2_Reg)
-summary(fit)
-
-autoplot(fit, size = 0.5)
-
-c1c2_Reg %>% ggplot(aes(x = Days_Supply, y = c1c2, col = year)) +
-  geom_point() + 
-    geom_smooth(
-    method = "lm",
-    formula = y ~ splines::bs(
-      x,
-      knots = c(30,35),
-      degree = 3,
-      intercept = T
-    ),
-    se = F,
-    col = "red"
-  )
-```
-
-```{r, eval=FALSE}
-#Prediction
-Days_Supply = data.frame(x = 32.3)
-fit %>% stats::predict(newdata = Days_Supply,
-                       interval = "prediction",
-                       level = 0.99)
-```
-
-
 ## Appendix-Trading Model Based on the Spread between Capacity and Stock:
-```{r}
+```{r, eval=FALSE}
 
 library(tidyverse)
 library(purrr)
@@ -1268,7 +1064,7 @@ p1
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 library(RTL)
 library(dplyr)
 
@@ -1297,9 +1093,7 @@ df_capacity$date = date_vector
 
 The stock for distillate in East Coast (PADD 1) accounts for the largest number and fluctuate seasonally. The only available data of capacity we can get from EIA API is from PADD 1, and no more information from any other PADDs. We can reasonably simplify our model by focus on the data in PADD 1 only.
 
-
-
-```{r}
+```{r, eval=FALSE}
 df_capacity_adj <- df_capacity %>% rename(
     c("capacity"="value")
     ) %>% 
@@ -1331,7 +1125,7 @@ df_join %>%
   geom_line()+ggtitle(fig.title)
 
 ```
-```{r}
+```{r, eval=FALSE}
 df_spread <- df_join %>% 
   transmute(
     date = date,
@@ -1348,7 +1142,7 @@ df_spread %>% ggplot(
 ```
 The spread here means the difference between Capacity and Stock (capacity-stock)
 
-```{r}
+```{r, eval=FALSE}
 library(ggplot2)
 df_HO_c1c2_Spd <- HOdf %>% 
   filter(Contracts == "HO_c1c2_Spd") %>% 
@@ -1406,15 +1200,13 @@ p3 <- df_join_all_long%>%
 p3
 ```
 It looks like the Time Spread(HO_01 vs HO_02) does not have good trend with our spread. While, we do not trade on continuous spread but on the real contracts.  Then the Crack Spread and the Time Spread(Apr22 vs Mar22) would be check.
-```{r}
+```{r, eval=FALSE}
 fit1 <- stats::lm(HO_Crack_Spd ~ as.vector(spread), data = df_join_all)
 summary(fit1)
-
-
 ```
 The result above indicates that the regression between HO_Crack_Spd ~ spread is really significant since F-statistic = 231.1 and R-squared = 0.6102.
 
-```{r}
+```{r, eval=FALSE}
 fit2 <- stats::lm(HO_Apr22_Mar22_Spd ~ as.vector(spread), data = df_join_all)
 summary(fit2)
 ```
@@ -1426,26 +1218,17 @@ The result above indicates that the regression between HO_Apr22_Mar22_Spd ~ spre
 As a result, the spread could be a reasonable variable to trade on crack spread based on the spread between stock and capacity.
 
 
-```{r}
+```{r, eval=FALSE}
 df_join_all %>%
   ggplot(aes(x = spread, y = HO_Crack_Spd, col = date)) +
   geom_point() +
     geom_smooth(method = "lm"
-
   )
-
-
-
 ```
 
 
-
-
-
-```{r}
+```{r, eval=FALSE}
 library(stats)
-
-
 
 new = data.frame(spread = 0.48782800)
 
@@ -1458,4 +1241,3 @@ fit1 %>% stats::predict.lm(newdata = new,
 df_join_all
 ```
 Here we can put the current spread value into the regression function to predict the HO_Crack_spread and compare that with the realistic level to  decide long or short the crack spread.
-
